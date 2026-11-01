@@ -830,8 +830,8 @@ namespace WowVisionInstaller
             Console.WriteLine($"    asset {Config.AssetName}, build {Config.LatestBuild ?? "(none)"}, heard as \"{Config.LatestVersion}\"");
             Check("beta build id read", !string.IsNullOrEmpty(Config.LatestBuild));
             Check("beta upload date read", Config.LatestBuildDate.HasValue);
-            Check("the installer's self-update looks at the beta release",
-                  GitHubClient.BuildInstallerDownloadUrl("x").Contains("/releases/download/beta/"));
+            Check("the installer's self-update looks at its latest release on the beta too",
+                  GitHubClient.BuildInstallerDownloadUrl("x").Contains("/releases/latest/download/"));
 
             Console.WriteLine("=== resolve: the newest stable release online ===");
             Config.SetChannel(Channel.Stable);

@@ -257,15 +257,14 @@ namespace WowVisionInstaller
         /// <summary>
         /// The ROLLING download URL for an asset on whichever INSTALLER release
         /// currently carries the "Latest" badge, e.g.
-        /// https://github.com/wow-vision/WowVision/releases/latest/download/WowVisionInstaller.exe (stable) or .../releases/download/beta/WowVisionInstaller.exe (beta) .
+        /// https://github.com/wow-vision/wowvision-installer/releases/latest/download/WowVisionInstaller.exe .
+        /// The same for both addon channels: the installer has no beta.
         /// <see cref="SelfUpdater"/> uses it so an exe built a year ago still
         /// resolves today's build without knowing any tag.
         /// </summary>
         public static string BuildInstallerDownloadUrl(string assetName) =>
-            Config.CurrentChannel == Channel.Beta
-                ? BuildDownloadUrl(Config.InstallerRepo, Config.BetaTag, assetName)
-                : $"https://github.com/{Config.InstallerRepo}/releases/latest/download/" +
-                  $"{Uri.EscapeDataString(assetName)}";
+            $"https://github.com/{Config.InstallerRepo}/releases/latest/download/" +
+            $"{Uri.EscapeDataString(assetName)}";
 
         /// <summary>
         /// Fetches a small text asset. Returns null on any failure — a missing

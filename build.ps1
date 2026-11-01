@@ -1,22 +1,22 @@
 <#
 build.ps1 - build the WowVision installer and the file that describes it.
 
-  .\installer\build.ps1
+  .\build.ps1
       1. dotnet build -c Release (installer + self-test).
-      2. Copy WowVisionInstaller.exe into installer\dist\.
-      3. Write installer\dist\installer-version.txt: version= and sha256= of
+      2. Copy WowVisionInstaller.exe into dist\.
+      3. Write dist\installer-version.txt: version= and sha256= of
          THAT file (what installed copies check before they replace themselves).
       4. Check the pair with the self-test's "versionfile" command.
 
-  .\installer\build.ps1 -RunTests
+  .\build.ps1 -RunTests
       The same, plus the network-free self-test suite ("offline") before the
-      files are written. The Installer workflow runs this.
+      files are written. The Release workflow runs this.
 
-  .\installer\build.ps1 -UploadTo beta
+  .\build.ps1 -UploadTo v1.0
       The same, then attach the exe, the version file and the bootstrap script
-      to that existing release of wow-vision/WowVision (needs gh signed in with
-      write access). The Installer workflow normally does this by itself after
-      every release and every beta; this is for doing it by hand.
+      to that existing release of wow-vision/wowvision-installer (needs gh
+      signed in with write access). The Release workflow normally does this by
+      itself for every v* tag; this is for doing it by hand.
 
   Bump <Version> in WowVisionInstaller\WowVisionInstaller.csproj when the
   installer changes: an installed copy only replaces itself with a HIGHER
@@ -25,7 +25,7 @@ build.ps1 - build the WowVision installer and the file that describes it.
 param(
     [switch]$RunTests,
     [string]$UploadTo,
-    [string]$Repo = 'wow-vision/WowVision'
+    [string]$Repo = 'wow-vision/wowvision-installer'
 )
 
 # NOT 'Stop': native tools (gh, dotnet) write normal status to stderr, which

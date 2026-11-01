@@ -54,11 +54,9 @@ namespace WowVisionInstaller
     ///     update ITSELF must still be able to update WowVision.
     ///
     /// The version is published as a tiny key=value asset next to the exe on the
-    /// WowVision releases themselves (written by build.ps1, attached by the
-    /// Installer workflow): for the stable channel the rolling
-    /// releases/latest/download URL, for the beta channel the beta release, so a
-    /// beta tester also gets installer fixes first. That is a plain github.com
-    /// download, NOT
+    /// installer's own releases (written by build.ps1, attached by the Release
+    /// workflow), read from the rolling releases/latest/download URL whichever
+    /// addon channel is chosen. That is a plain github.com download, NOT
     /// api.github.com, so it cannot hit the 60-request/hour rate limit that made us
     /// avoid the REST API everywhere else.
     /// </summary>

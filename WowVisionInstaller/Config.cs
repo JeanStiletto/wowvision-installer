@@ -63,17 +63,18 @@ namespace WowVisionInstaller
     {
         public const string DisplayName = "WowVision";
 
-        // ── where the addon AND the installer come from ─────────────────────
-        // The maintainers' repository. Its releases are made by GitHub Actions:
+        // ── where the addon and the installer come from ─────────────────────
+        // The addon repository. Its releases are made by GitHub Actions:
         //   stable: a V* tag, e.g. tag "V0.9.0", asset "WowVision-V0.9.0.zip";
         //   beta:   one moving pre-release under the tag "beta", rebuilt on every
         //           push to main, asset "WowVision-beta.zip".
         // The packager writes a release.json beside each zip (which names it).
-        // The installer ships as an asset on the same releases
-        // (.github/workflows/installer.yml attaches InstallerExeName and
-        // installer-version.txt to every stable release and to the beta).
+        // The installer has its own repository and releases (a v* tag; the
+        // Release workflow attaches InstallerExeName, installer-version.txt and
+        // the bootstrap script). It has no beta of its own: whichever channel
+        // the addon follows, the installer updates itself from its latest release.
         public const string AddonRepo = "wow-vision/WowVision";
-        public const string InstallerRepo = AddonRepo;
+        public const string InstallerRepo = "wow-vision/wowvision-installer";
         public const string InstallerExeName = "WowVisionInstaller.exe";
 
         public const string SiteUrl = "https://github.com/" + AddonRepo;

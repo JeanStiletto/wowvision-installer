@@ -119,17 +119,15 @@ opening screen says which one the installer follows.
   IP and locked Sku users out. The zip's name is read from the `release.json`
   the packager puts beside it; if that fails, the naming `WowVision-<tag>.zip`
   is used.
-- The installer: the same releases. The Installer workflow
-  (`.github/workflows/installer.yml`) runs after "Package and release" and after
-  "Beta pre-release", builds the installer on Windows, runs the offline tests,
-  and attaches `WowVisionInstaller.exe`, `installer-version.txt` (version and
-  SHA-256 of the exe) and the bootstrap script to that release. Installed
-  copies update themselves from `releases/latest/download` (stable) or from
-  the beta release (beta), and only run a downloaded exe whose hash matches.
-- The download link for people: `https://github.com/wow-vision/WowVision/releases/latest/download/WowVisionInstaller.exe`
-  (or the same file on the beta release). Whichever they start with, the
-  channel they then choose decides what gets installed.
-- `installer/` is in `.pkgmeta`'s ignore list, so it never lands in the addon zip.
+- The installer: this repository's own releases, made by the Release workflow
+  (`.github/workflows/release.yml`) for every `v*` tag. It builds the installer
+  on Windows, runs the offline tests, and publishes `WowVisionInstaller.exe`,
+  `installer-version.txt` (version and SHA-256 of the exe) and the bootstrap
+  script. The installer has no beta of its own: installed copies update
+  themselves from `releases/latest/download` whichever addon channel they
+  follow, and only run a downloaded exe whose hash matches.
+- The download link for people: `https://github.com/wow-vision/wowvision-installer/releases/latest/download/WowVisionInstaller.exe`.
+  The channel they then choose decides what gets installed.
 
 ## Rules worth knowing
 
@@ -222,7 +220,9 @@ dotnet build WowVisionInstaller\WowVisionInstaller.csproj
 dotnet build WowVisionSelfTest\WowVisionSelfTest.csproj
 ```
 
-.NET Framework 4.8 WinForms; any recent .NET SDK builds it.
+.NET Framework 4.8 WinForms; any recent .NET SDK builds it. Every push and
+pull request runs the build and the offline suite on Windows (the Release
+workflow's check job).
 
 ## Test without the windows
 
@@ -261,17 +261,20 @@ writes, the real extra-addon choices.)
 
 ## Release
 
-Nothing to do by hand: every addon release and every beta gets the installer
-from the Installer workflow. When the installer itself changed, bump
-`<Version>` in `WowVisionInstaller\WowVisionInstaller.csproj`; installed copies
-only replace themselves with a higher version.
+An addon release needs nothing here: the installer finds new WowVision
+releases by itself. When the installer itself changed:
 
-- `installer\build.ps1` builds the Release exe into `installer\dist\` with its
+1. Bump `<Version>` in `WowVisionInstaller\WowVisionInstaller.csproj`; installed
+   copies only replace themselves with a higher version.
+2. Push the tag `v<Version>`, e.g. `v1.1`. The Release workflow checks that the
+   tag matches the csproj, builds, runs the offline suite and publishes the
+   release with its three files.
+
+- `build.ps1` builds the Release exe into `dist\` with its
   `installer-version.txt` and checks the pair; `-RunTests` adds the offline
   suite (what the workflow runs).
-- `installer\build.ps1 -UploadTo <tag>` also attaches the three files to that
-  existing release by hand (gh with write access). The workflow's manual run
-  does the same from GitHub, e.g. for a release made before it existed.
+- `build.ps1 -UploadTo <tag>` also attaches the three files to that existing
+  release by hand (gh with write access).
 - Afterwards `WowVisionSelfTest.exe selfupdate` downloads the published exe and
   verifies it the way installed copies will.
 
@@ -296,4 +299,4 @@ only replace themselves with a higher version.
 - `WowVisionSelfTest\`: the headless test harness.
 - `bootstrap\Install-WowVisionUpdater.ps1`: download, check and start the exe in one line.
 - `build.ps1`: build, version file, checks; optional upload.
-- `../.github/workflows/installer.yml`: builds and attaches the installer to every release and beta.
+- `.github/workflows/release.yml`: build and offline tests on every push; a release for every `v*` tag.

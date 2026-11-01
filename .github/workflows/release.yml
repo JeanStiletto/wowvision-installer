@@ -1,0 +1,53 @@
+name: Release
+
+# Every push and pull request: build the installer on Windows and run the
+# network-free self-test suite.
+# A v* tag (e.g. v1.1, matching <Version> in the csproj): the same, then a
+# GitHub release of that tag carrying WowVisionInstaller.exe,
+# installer-version.txt (version and SHA-256 of the exe) and the bootstrap
+# script. Installed copies update themselves from releases/latest/download.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v4
+
+      - name: Build and test
+        shell: pwsh
+        run: ./build.ps1 -RunTests
+
+      - name: Check the tag against the version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = ((Get-Content dist/installer-version.txt | Where-Object { $_ -match '^version=' } | Select-Object -First 1) -replace '^version=', '').Trim()
+          if ($tag -ne "v$version") {
+            throw "Tag $tag does not match the installer version $version (expected v$version)."
+          }
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The exe and the version file that describes it go up in ONE call,
+          # so a release never carries a new exe with an old checksum.
+          gh release create "${{ github.ref_name }}" `
+            dist/WowVisionInstaller.exe `
+            dist/installer-version.txt `
+            bootstrap/Install-WowVisionUpdater.ps1 `
+            --repo "${{ github.repository }}" `
+            --title "WowVision Installer ${{ github.ref_name }}" `
+            --generate-notes --latest
