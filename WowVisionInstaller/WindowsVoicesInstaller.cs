@@ -24,8 +24,10 @@ namespace WowVisionInstaller
     ///      backup, no change;
     ///   3. copy each missing token with its values and Attributes subkey.
     ///
-    /// Runs on every install like the bridge, so voices installed since are
-    /// picked up. Every failure is logged + announced but non-fatal.
+    /// Only when ticked on the components page (off by default, never part of
+    /// "Update now"): it changes the machine's voice list for every SAPI
+    /// program, not just WoW. Run again, it picks up voices installed since.
+    /// Every failure is logged + announced but non-fatal.
     /// </summary>
     internal static class WindowsVoicesInstaller
     {

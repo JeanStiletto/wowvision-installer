@@ -37,8 +37,12 @@
 
          1.2 = WoW Forever out of its beta folder: an empty _forever_ beside a
          _classic_beta_ with WowVision is the player's Forever (ticked, and in
-         "Update now"), and a folder remembered from the beta gives way to it. -->
-    <Version>1.2</Version>
+         "Update now"), and a folder remembered from the beta gives way to it.
+
+         1.3 = the NVDA voice bridge and "Make all Windows voices available" are
+         off by default and never part of "Update now": both change the
+         machine's voice list. -->
+    <Version>1.3</Version>
     <!-- File properties (Explorer "Details", and what antivirus reputation
          scoring reads). The exe is NOT Authenticode-signed (no paid
          certificate), so this is the only identity it carries. -->

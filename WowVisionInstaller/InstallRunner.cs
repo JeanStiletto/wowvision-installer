@@ -10,8 +10,16 @@ namespace WowVisionInstaller
     public class InstallOptions
     {
         public bool DesktopShortcut = true;
-        public bool InstallSapi2Sr = true;
-        public bool InstallWindowsVoices = true;
+        /// <summary>
+        /// The two voice steps are off unless ticked on the components page: the
+        /// bridge registers a voice and signs its engine machine-wide, the Windows
+        /// voices step adds voices to the machine's SAPI list. Both change what
+        /// every SAPI program offers (and can shift the game's voice numbers).
+        /// Nobody should get that without choosing it, and "Update now" (which
+        /// runs on these defaults) never does either.
+        /// </summary>
+        public bool InstallSapi2Sr = false;
+        public bool InstallWindowsVoices = false;
         public bool InstallLoginTool = true;
 
         /// <summary>

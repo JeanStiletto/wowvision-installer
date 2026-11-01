@@ -21,7 +21,9 @@ from Sku as they are.
    getting the build that exists for it.
 7. Installs the WoW Login Tool for the clients it supports.
 8. Optionally installs the NVDA voice bridge and makes all Windows voices
-   available to the game.
+   available to the game. Both are off by default: they change the machine's
+   own voice list, which every SAPI program then offers, so only a player who
+   ticks them gets them, and "Update now" never runs them.
 9. Puts a copy of itself in `%LOCALAPPDATA%\WowVisionUpdater` with a desktop and
    Start menu shortcut "WowVision Updater". Run later, that copy is the updater:
    it first updates itself, then WowVision.
