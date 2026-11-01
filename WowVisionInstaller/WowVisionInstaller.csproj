@@ -29,8 +29,12 @@
          game settings, NVDA voice bridge, Windows voices, remembered folders,
          log collection, self-update, the WoW Login Tool (Forever, Anniversary,
          Era) and Sku's extra addons with a check per game version. Left out:
-         voice packs (WowVision has none) and macOS. -->
-    <Version>1.0</Version>
+         voice packs (WowVision has none) and macOS.
+
+         1.1 = its own repository and releases (wow-vision/wowvision-installer);
+         GTFO, Details, BugGrabber and AtlasLoot Continued follow their newest
+         CurseForge release instead of a pin that went stale. -->
+    <Version>1.1</Version>
     <!-- File properties (Explorer "Details", and what antivirus reputation
          scoring reads). The exe is NOT Authenticode-signed (no paid
          certificate), so this is the only identity it carries. -->
@@ -54,6 +58,8 @@
     <Reference Include="System.IO.Compression.FileSystem" />
     <!-- Required for the `dynamic` late-binding used to create .lnk shortcuts. -->
     <Reference Include="Microsoft.CSharp" />
+    <!-- JavaScriptSerializer: the CurseForge file listing. -->
+    <Reference Include="System.Web.Extensions" />
   </ItemGroup>
 
   <ItemGroup>

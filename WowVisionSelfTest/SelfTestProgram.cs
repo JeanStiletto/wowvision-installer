@@ -52,6 +52,8 @@ namespace WowVisionInstaller
                 case "resolve":         RunResolve(); break;
                 case "fullinstall":     RunFullInstall(); break;
                 case "availability":    RunAvailabilityTest(); break;
+                case "cursetest":       RunCurseTest(); break;
+                case "curseforge":      RunCurseLive(); break;
                 case "texturesweep":    RunTextureSweepTest(); break;
                 case "managedinstall":  RunManagedInstallTest(arg1 ?? Config.MistsFlavor); break;
                 case "logintool":       RunLoginToolTest(arg1 ?? Config.AnniversaryFlavor); break;
@@ -63,6 +65,7 @@ namespace WowVisionInstaller
                     // Everything that needs no network, in one go.
                     RunClientTest(); RunTocTest(); RunVersionTest(); RunPathMemoryTest();
                     RunLocTest(); RunLogTest(); RunAvailabilityTest(); RunTextureSweepTest();
+                    RunCurseTest();
                     break;
                 default:
                     Console.WriteLine("WowVisionSelfTest commands:");
@@ -74,6 +77,8 @@ namespace WowVisionInstaller
                     Console.WriteLine("  loc              the three text tables have the same keys and placeholders");
                     Console.WriteLine("  logtest          the log bundle from a throwaway WoW folder");
                     Console.WriteLine("  availability     which client gets the map data, the login tool and each extra addon");
+                    Console.WriteLine("  cursetest        picking the newest file from a CurseForge listing, file server URLs");
+                    Console.WriteLine("  curseforge       the newest CurseForge file of each extra addon online (no download)");
                     Console.WriteLine("  texturesweep     the login tool's stale-texture cleanup (throwaway folders)");
                     Console.WriteLine("  managedinstall [product]  REAL downloads of every extra addon for one client (default wow_classic)");
                     Console.WriteLine("  logintool [product]       REAL login tool download into a throwaway client (default wow_anniversary)");
@@ -619,6 +624,63 @@ namespace WowVisionInstaller
         /// table, and the extra addons' per-client package lists (which mirror
         /// the probe of the real zips from 2026-10-19).
         /// </summary>
+        private static void RunCurseTest()
+        {
+            Console.WriteLine("=== cursetest: the newest file of a CurseForge listing ===");
+            // The shape of /api/v1/mods/{id}/files: a nested "user" with its own
+            // id, an alpha, an early-access file, a renamed zip, an older release,
+            // and the newest release last so order cannot decide.
+            string json = "{\"data\":[" +
+                "{\"id\":950,\"fileName\":\"GTFO-7.0-alpha.zip\",\"fileLength\":10,\"releaseType\":1}," +
+                "{\"id\":900,\"fileName\":\"GTFO-7.0.zip\",\"fileLength\":10,\"releaseType\":3,\"user\":{\"id\":99999999}}," +
+                "{\"id\":800,\"fileName\":\"GTFO-6.13.zip\",\"fileLength\":10,\"releaseType\":1,\"isEarlyAccessContent\":true}," +
+                "{\"id\":700,\"fileName\":\"GTFO-Renamed-6.14.zip\",\"fileLength\":10,\"releaseType\":1}," +
+                "{\"id\":500,\"fileName\":\"GTFO-6.12.1.zip\",\"fileLength\":489385,\"releaseType\":1,\"isEarlyAccessContent\":false}," +
+                "{\"id\":600,\"fileName\":\"GTFO-6.12.2.zip\",\"fileLength\":490433,\"releaseType\":1,\"isEarlyAccessContent\":false,\"user\":{\"id\":7}}" +
+                "],\"pagination\":{}}";
+            const string gtfo = @"^GTFO-(\d[\d.]*)\.zip$";
+            var f = CurseForge.PickLatest(json, gtfo);
+            Check("the newest full release is picked", f != null && f.Id == 600);
+            Check("its version is the pattern's group", f != null && f.Version == "6.12.2");
+            Check("its listed size is kept", f != null && f.Length == 490433);
+            Check("alpha, early access and a renamed zip are passed over",
+                  f != null && f.FileName == "GTFO-6.12.2.zip");
+            Check("an empty listing gives nothing", CurseForge.PickLatest("{\"data\":[],\"pagination\":{}}", gtfo) == null);
+            Check("an error page gives nothing", CurseForge.PickLatest("<html>blocked</html>", gtfo) == null);
+            Check("file server URL has no padding",
+                  CurseForge.DownloadUrl(8619054, "!BugGrabber-v12.0.21.zip").StartsWith("https://edge.forgecdn.net/files/8619/54/"));
+            Check("file server URL splits the id",
+                  CurseForge.DownloadUrl(9208630, "GTFO-6.12.2.zip") == "https://edge.forgecdn.net/files/9208/630/GTFO-6.12.2.zip");
+
+            Console.WriteLine("=== cursetest: every CurseForge package names its pin the way its pattern does ===");
+            foreach (var entry in ManagedAddons.Entries)
+                foreach (var p in entry.Packages)
+                {
+                    if (p.CurseProjectId <= 0) continue;
+                    string pinFile = Uri.UnescapeDataString(p.PinUrl.Substring(p.PinUrl.LastIndexOf('/') + 1));
+                    var m = Regex.Match(pinFile, p.CurseFilePattern);
+                    Check($"{p.Key}: pin {pinFile} reads as {p.PinVersion}",
+                          m.Success && m.Groups[1].Value == p.PinVersion);
+                }
+        }
+
+        private static void RunCurseLive()
+        {
+            Console.WriteLine("=== curseforge: the newest file of each extra addon online ===");
+            using (var github = new GitHubClient())
+            {
+                foreach (var entry in ManagedAddons.Entries)
+                    foreach (var p in entry.Packages)
+                    {
+                        if (p.CurseProjectId <= 0) continue;
+                        var f = CurseForge.ResolveLatestAsync(github, p.CurseProjectId, p.CurseFilePattern,
+                                                              TimeSpan.FromSeconds(30)).GetAwaiter().GetResult();
+                        Console.WriteLine($"    {p.Key,-26} {(f == null ? "(none)" : f.FileName + ", " + f.Length + " bytes")}  pin {p.PinVersion}");
+                        Check($"{p.Key}: a release file found", f != null && f.Length > 0);
+                    }
+            }
+        }
+
         private static void RunAvailabilityTest()
         {
             Console.WriteLine("=== availability: map data ===");

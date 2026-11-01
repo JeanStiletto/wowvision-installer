@@ -64,11 +64,14 @@ The table is the `LoginTool` column of `WowLocator.Clients`.
 
 ## Extra addons
 
-Sku's list, with the same packages, pins and checks (SHA-256 for CurseForge
-pins, zip shape, symlink guard, obsolete AtlasLoot folders removed, choices
-kept in `%LOCALAPPDATA%\WowVisionUpdater\WowVisionManagedAddons.txt`, Pawn off
-by default). What is new is the check per game version. Each package names the
-clients it exists for, taken from the real zips on 2026-10-19:
+Sku's list, with the same packages and checks (SHA-256 for every pin, zip
+shape, symlink guard, obsolete AtlasLoot folders removed, choices kept in
+`%LOCALAPPDATA%\WowVisionUpdater\WowVisionManagedAddons.txt`, Pawn off by
+default). What is new: the addons without GitHub releases (GTFO, Details,
+BugGrabber, AtlasLoot Continued) follow their newest CurseForge release instead
+of a pin (see "Where things come from"), and the check per game version. Each
+package names the clients it exists for, taken from the real zips on
+2026-10-19:
 
 - Questie: every client except Retail.
 - AtlasLoot Continued: WoW Forever, Anniversary, Classic Era (no Mists or
@@ -128,6 +131,18 @@ opening screen says which one the installer follows.
   follow, and only run a downloaded exe whose hash matches.
 - The download link for people: `https://github.com/wow-vision/wowvision-installer/releases/latest/download/WowVisionInstaller.exe`.
   The channel they then choose decides what gets installed.
+- The extra addons: the project's own GitHub releases where it has them
+  (Questie, Pawn, Deadly Boss Mods, BugSack), otherwise its newest CurseForge
+  release file (GTFO, Details, BugGrabber, AtlasLoot Continued). CurseForge is
+  read through the file listing its website uses,
+  `www.curseforge.com/api/v1/mods/<project>/files`, which needs no API key; it
+  is not CurseForge's documented API. Only full releases count (no alpha, beta
+  or early access), and only a file whose name matches the package's pattern,
+  digits and dots for the version, so a renamed zip waits for a look at the
+  package instead of being installed. The zip comes from the file server
+  (`edge.forgecdn.net/files/<id / 1000>/<id % 1000>/<name>`) and must have the
+  size the listing gives. Whatever cannot be read, from GitHub or CurseForge,
+  falls back to the package's pin: a fixed file with its SHA-256.
 
 ## Rules worth knowing
 
@@ -229,7 +244,7 @@ workflow's check job).
 `WowVisionSelfTest\bin\Debug\net48\WowVisionSelfTest.exe <command>` prints
 PASS and FAIL lines and sets the exit code. Without a command it lists them.
 
-- `offline`: every network-free test in one run (the next eight).
+- `offline`: every network-free test in one run (the next nine).
 - `clienttest`: a throwaway World of Warcraft folder with all five clients plus
   a PTR: detection, the TOC each client reads, TOC drift, folder picking, game
   settings, status lines, a developer junction.
@@ -241,12 +256,17 @@ PASS and FAIL lines and sets the exit code. Without a command it lists them.
   every key the code uses exists.
 - `logtest`: the log bundle from the throwaway folder.
 - `availability`: who gets the map data, the login tool and each extra addon.
+- `cursetest`: the newest file picked from a CurseForge listing (alphas, early
+  access and renamed zips passed over), file server URLs, every pin named the
+  way its pattern reads it.
 - `texturesweep`: the login tool's stale-texture cleanup.
 - `managedinstall [product]`: every extra addon of one client, REAL downloads,
   into a throwaway folder, then a second run that must find nothing to do.
 - `logintool [product]`: the REAL login tool into a throwaway client: folder,
   marker, textures only where needed. No shortcut is created.
 - `resolve`: the newest WowVision release online, no download.
+- `curseforge`: the newest CurseForge file of each extra addon online, no
+  download.
 - `fullinstall`: the REAL release downloaded once and installed into all five
   throwaway clients, then a second run that must find nothing to do.
 - `selfupdate`, `selfupdateproof`: the published installer and its hash check
@@ -290,6 +310,7 @@ releases by itself. When the installer itself changed:
   - `InstallTarget.cs`: one client and its status line.
   - `TocSync.cs`, `GameSettings.cs`, `InstallManifest.cs`, `PathMemory.cs`.
   - `ManagedAddons.cs`: the extra addons (list, resolution, install).
+  - `CurseForge.cs`: the newest release file of a CurseForge project.
   - `LoginToolInstaller.cs`: the WoW Login Tool.
   - `SelfUpdater.cs`, `Shortcut.cs`, `Sapi2SrInstaller.cs`, `WindowsVoicesInstaller.cs`.
   - `LogCollector.cs`, `Logger.cs`, `Loc.cs`, `ScreenReaderAnnouncer.cs`, `AppVersion.cs`.

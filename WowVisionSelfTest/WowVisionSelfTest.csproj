@@ -23,6 +23,7 @@
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Web.Extensions" />
   </ItemGroup>
 
   <!-- The engine sources. Left out: Program.cs and the forms. Shortcut.cs and
@@ -37,6 +38,7 @@
     <Compile Include="..\WowVisionInstaller\Loc.cs"                    Link="Loc.cs" />
     <Compile Include="..\WowVisionInstaller\AppVersion.cs"             Link="AppVersion.cs" />
     <Compile Include="..\WowVisionInstaller\GitHubClient.cs"           Link="GitHubClient.cs" />
+    <Compile Include="..\WowVisionInstaller\CurseForge.cs"             Link="CurseForge.cs" />
     <Compile Include="..\WowVisionInstaller\WowLocator.cs"             Link="WowLocator.cs" />
     <Compile Include="..\WowVisionInstaller\InstallManifest.cs"        Link="InstallManifest.cs" />
     <Compile Include="..\WowVisionInstaller\AddonInstaller.cs"         Link="AddonInstaller.cs" />

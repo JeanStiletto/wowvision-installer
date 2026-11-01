@@ -11,10 +11,11 @@ namespace WowVisionInstaller
 {
     /// <summary>
     /// One downloadable zip inside a managed entry. A github package tracks the
-    /// project's own /releases/latest; a pinned package (CurseForge-only addons)
-    /// always installs the baked-in (version, url, sha256) triple. The github
-    /// fallback pin covers "redirect unreachable" the same way the main addon's
-    /// build-time pin does.
+    /// project's own /releases/latest; a CurseForge package (addons without
+    /// GitHub releases) tracks the project's newest release file there
+    /// (<see cref="CurseForge"/>). Either falls back to the baked-in
+    /// (version, url, sha256) pin when its source cannot be read, the same way
+    /// the main addon's build-time pin does.
     /// </summary>
     public class ManagedPackage
     {
@@ -46,8 +47,19 @@ namespace WowVisionInstaller
         /// </summary>
         public string RootPrefix;
 
-        /// <summary>"owner/repo" whose /releases/latest is tracked, or null for pinned.</summary>
+        /// <summary>"owner/repo" whose /releases/latest is tracked, or null.</summary>
         public string GitHubRepo;
+
+        /// <summary>CurseForge project id whose newest release file is tracked, or 0.</summary>
+        public int CurseProjectId;
+
+        /// <summary>
+        /// Regex the CurseForge file name must match, group 1 = the version label
+        /// (e.g. "^GTFO-(\d[\d.]*)\.zip$" gives "6.12.2"; digits
+        /// and dots only, so a renamed or alpha-labelled zip never passes). The pin's label is written
+        /// the same way, so a live file equal to the pin counts as the same version.
+        /// </summary>
+        public string CurseFilePattern;
 
         /// <summary>
         /// Asset filename with the release tag substituted, e.g. "BugSack-{tag}.zip".
@@ -91,7 +103,8 @@ namespace WowVisionInstaller
         public ManagedPackage Package;
         public string Version;   // recorded in the manifest; release tag for github packages
         public string Url;
-        public string Sha256;    // null when the source is a live github release (TLS + canonical URL)
+        public string Sha256;    // null when the source is live (github release or CurseForge file)
+        public long ExpectedLength;   // the size CurseForge lists for a live file; 0 = not checked
     }
 
     /// <summary>
@@ -101,8 +114,8 @@ namespace WowVisionInstaller
     /// zips are multi-flavor and serve several clients from one download; each
     /// package names the clients it is available for (see
     /// <see cref="ManagedPackage.Products"/>). GitHub is used for every addon that
-    /// publishes releases there; the CurseForge CDN pins remain only for addons
-    /// without GitHub releases (AtlasLoot, Details, GTFO, BugGrabber).
+    /// publishes releases there; the addons without GitHub releases (AtlasLoot,
+    /// Details, GTFO, BugGrabber) follow their newest CurseForge release file.
     ///
     /// Availability, checked against the real zips on 2026-10-19:
     ///   Questie: every client but Retail. AtlasLoot Continued: Forever, TBC, Era.
@@ -181,9 +194,11 @@ namespace WowVisionInstaller
                             "AtlasLoot_Options",
                             "AtlasLoot_PvP",
                         },
-                        PinVersion = "12488",
-                        PinUrl = "https://edge.forgecdn.net/files/9187/862/AtlasLootClassic-Continued_12488.zip",
-                        PinSha256 = "8eaee376a19b26da4a50f4f7f7304f9f41b3eadfd0bd38c4fd98f67495fa82bd",
+                        CurseProjectId = 1270310,
+                        CurseFilePattern = @"^AtlasLootClassic-Continued_(\d+)\.zip$",
+                        PinVersion = "12857",
+                        PinUrl = "https://edge.forgecdn.net/files/9359/158/AtlasLootClassic-Continued_12857.zip",
+                        PinSha256 = "c9a6bdd662ecff514f49f1451d9930814a3b2691750ed282e42800c98a207694",
                     },
                 },
             },
@@ -200,9 +215,11 @@ namespace WowVisionInstaller
                         Key = "CurseDetails",
                         RequiredRoots = new[] { "Details", "Details_DataStorage" },
                         RootPrefix = "Details",
-                        PinVersion = "20261014.15330.172",
-                        PinUrl = "https://edge.forgecdn.net/files/9177/176/Details-Details.20261014.15330.172.zip",
-                        PinSha256 = "67c4fe6c81e7bc331098e67bce00ee049735d278a7c9d04c9d749930233e5086",
+                        CurseProjectId = 61284,
+                        CurseFilePattern = @"^Details-Details\.(\d[\d.]*)\.zip$",
+                        PinVersion = "20261015.15339.172",
+                        PinUrl = "https://edge.forgecdn.net/files/9202/791/Details-Details.20261015.15339.172.zip",
+                        PinSha256 = "ef80d53558fe0caebcd0f8b0a585025772e36e2d4a60eea1c4d99569e0d31fc0",
                     },
                 },
             },
@@ -334,11 +351,15 @@ namespace WowVisionInstaller
                     new ManagedPackage
                     {
                         Key = "CurseGTFO", RequiredRoots = new[] { "GTFO" },
-                        // 6.11+ ships GTFO_Camelot.toc; older pins would load the
-                        // retail GTFO_Mainline.toc on WoW Forever.
-                        PinVersion = "6.12.1",
-                        PinUrl = "https://edge.forgecdn.net/files/9187/115/GTFO-6.12.1.zip",
-                        PinSha256 = "a2dd43bd4c61cc19ba5fb8efbf5953380f9905d3e2cc0a97260eccf5e63ec5d2",
+                        // Live from CurseForge: GTFO's spell lists follow each
+                        // new boss, and it is a blind player's warning of standing
+                        // in a mechanic. 6.11+ ships GTFO_Camelot.toc; older pins
+                        // would load the retail GTFO_Mainline.toc on WoW Forever.
+                        CurseProjectId = 20697,
+                        CurseFilePattern = @"^GTFO-(\d[\d.]*)\.zip$",
+                        PinVersion = "6.12.2",
+                        PinUrl = "https://edge.forgecdn.net/files/9208/630/GTFO-6.12.2.zip",
+                        PinSha256 = "453ea508547640b3d6e5d565c260b87b9db73e03952f2299624b4711de0b038c",
                     },
                 },
             },
@@ -359,9 +380,11 @@ namespace WowVisionInstaller
                     new ManagedPackage
                     {
                         Key = "CurseBugGrabber", RequiredRoots = new[] { "!BugGrabber" },
-                        PinVersion = "12.1.0",
-                        PinUrl = "https://edge.forgecdn.net/files/8907/587/%21BugGrabber-v12.1.0.zip",
-                        PinSha256 = "248fe28b39a9e85bb7ddd23b02ef335715b82fb6d93dd7a3ce568dc51967c1df",
+                        CurseProjectId = 13344,
+                        CurseFilePattern = @"^!BugGrabber-v(\d[\d.]*)\.zip$",
+                        PinVersion = "12.1.1",
+                        PinUrl = "https://edge.forgecdn.net/files/9277/326/%21BugGrabber-v12.1.1.zip",
+                        PinSha256 = "1e53e65c72f525a45c8951abe06415df5b1fb52ec21e30970c1416a2fbd4a250",
                     },
                 },
             },
@@ -373,10 +396,10 @@ namespace WowVisionInstaller
             new Dictionary<string, ResolvedManagedPackage>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
-        /// Resolve every github-tracked package to its current release, in
-        /// parallel, bounded by <paramref name="timeout"/>. Whatever does not
-        /// resolve in time stays on its pin — same graceful degradation as the
-        /// main addon's version redirect. Called once at startup.
+        /// Resolve every github- or CurseForge-tracked package to its current
+        /// release, in parallel, bounded by <paramref name="timeout"/>. Whatever
+        /// does not resolve in time stays on its pin — same graceful degradation
+        /// as the main addon's version redirect. Called once at startup.
         /// </summary>
         public static void ResolveAll(GitHubClient github, TimeSpan timeout)
         {
@@ -392,8 +415,28 @@ namespace WowVisionInstaller
             {
                 foreach (var pkg in entry.Packages)
                 {
-                    if (string.IsNullOrEmpty(pkg.GitHubRepo)) continue;
                     var p = pkg;
+                    if (p.CurseProjectId > 0)
+                    {
+                        tasks.Add(Task.Run(async () =>
+                        {
+                            var f = await CurseForge.ResolveLatestAsync(github, p.CurseProjectId,
+                                                                        p.CurseFilePattern, timeout);
+                            if (f == null) return;
+                            // The newest file IS the pin: keep the pin's checksum.
+                            bool isPin = string.Equals(f.Version, p.PinVersion, StringComparison.OrdinalIgnoreCase);
+                            var r = new ResolvedManagedPackage
+                            {
+                                Package = p, Version = f.Version, ExpectedLength = f.Length,
+                                Url = isPin ? p.PinUrl : CurseForge.DownloadUrl(f.Id, f.FileName),
+                                Sha256 = isPin ? p.PinSha256 : null,
+                            };
+                            lock (_resolved) _resolved[p.Key] = r;
+                            Logger.Info($"{p.Key}: newest CurseForge file {f.FileName} (project {p.CurseProjectId}).");
+                        }));
+                        continue;
+                    }
+                    if (string.IsNullOrEmpty(p.GitHubRepo)) continue;
                     tasks.Add(Task.Run(async () =>
                     {
                         string tag = await github.ResolveLatestTagAsync(p.GitHubRepo, p.TagPrefix);
@@ -681,10 +724,20 @@ namespace WowVisionInstaller
 
                 // Integrity: pinned sources carry a baked-in hash. Live github
                 // downloads are the canonical release URL over TLS — the same
-                // trust model every other download in this installer uses.
+                // trust model every other download in this installer uses. Live
+                // CurseForge files have no published hash; they must have the
+                // size CurseForge lists for them.
                 if (!string.IsNullOrEmpty(resolved.Sha256) && !VerifySha256(tempZip, resolved.Sha256))
                 {
                     Logger.Warning($"{pkg.Key}: SHA-256 mismatch — refusing the download.");
+                    report(new InstallProgress { Addon = entry.DisplayName, Phase = "skip",
+                        Percent = -1, Message = Loc.Format("managed.badHash", entry.DisplayName) });
+                    return false;
+                }
+                long gotLength = new FileInfo(tempZip).Length;
+                if (resolved.ExpectedLength > 0 && gotLength != resolved.ExpectedLength)
+                {
+                    Logger.Warning($"{pkg.Key}: {gotLength} bytes where CurseForge lists {resolved.ExpectedLength} — refusing the download.");
                     report(new InstallProgress { Addon = entry.DisplayName, Phase = "skip",
                         Percent = -1, Message = Loc.Format("managed.badHash", entry.DisplayName) });
                     return false;
