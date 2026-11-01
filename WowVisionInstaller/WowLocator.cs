@@ -219,6 +219,28 @@ namespace WowVisionInstaller
         }
 
         /// <summary>
+        /// The Interface\AddOns folder of another flavor folder in the same WoW
+        /// base, e.g. ...\_classic_beta_\Interface\AddOns beside
+        /// ...\_forever_\Interface\AddOns. Null when it does not exist, or when
+        /// <paramref name="addonsFolder"/> already is that flavor folder's.
+        /// </summary>
+        public static string SiblingAddOns(string addonsFolder, string flavorFolder)
+        {
+            if (string.IsNullOrEmpty(addonsFolder)) return null;
+            try
+            {
+                string flavorDir = Path.GetDirectoryName(Path.GetDirectoryName(addonsFolder.TrimEnd('\\', '/')));
+                string baseDir = Path.GetDirectoryName(flavorDir);
+                if (string.IsNullOrEmpty(baseDir) ||
+                    Path.GetFileName(flavorDir).Equals(flavorFolder, StringComparison.OrdinalIgnoreCase))
+                    return null;
+                string sibling = Path.Combine(baseDir, flavorFolder, "Interface", "AddOns");
+                return Directory.Exists(sibling) ? sibling : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
         /// Which client an Interface\AddOns folder belongs to, e.g.
         /// wow_classic_beta, or null if it can't be told. An AddOns path is
         /// &lt;base&gt;\&lt;flavor&gt;\Interface\AddOns, so the flavor folder is two

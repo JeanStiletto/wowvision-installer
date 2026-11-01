@@ -33,8 +33,12 @@
 
          1.1 = its own repository and releases (wow-vision/wowvision-installer);
          GTFO, Details, BugGrabber and AtlasLoot Continued follow their newest
-         CurseForge release instead of a pin that went stale. -->
-    <Version>1.1</Version>
+         CurseForge release instead of a pin that went stale.
+
+         1.2 = WoW Forever out of its beta folder: an empty _forever_ beside a
+         _classic_beta_ with WowVision is the player's Forever (ticked, and in
+         "Update now"), and a folder remembered from the beta gives way to it. -->
+    <Version>1.2</Version>
     <!-- File properties (Explorer "Details", and what antivirus reputation
          scoring reads). The exe is NOT Authenticode-signed (no paid
          certificate), so this is the only identity it carries. -->

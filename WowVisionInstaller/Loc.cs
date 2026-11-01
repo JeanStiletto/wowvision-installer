@@ -133,6 +133,7 @@ namespace WowVisionInstaller
             // the user is listening for.
             ["target.notFound"]        = "Not found on this computer — tick it anyway and point to it in the next step.",
             ["target.freshInstall"]    = "New install — WowVision {0} will be installed here.",
+            ["target.movedFromBeta"]   = "New folder since the beta ended — WowVision {0} will be installed here.",
             ["target.upToDate"]        = "Up to date — WowVision {0} is installed.",
             ["target.updateAvailable"] = "Update available — WowVision {0} is installed, {1} is available.",
             ["target.versionUnknown"]  = "(version unknown)",
@@ -379,6 +380,7 @@ namespace WowVisionInstaller
             // ── Statuszeilen je Spielversion ─────────────────────────────────
             ["target.notFound"]        = "Nicht gefunden auf diesem Computer – trotzdem ankreuzen und im nächsten Schritt den Ordner angeben.",
             ["target.freshInstall"]    = "Neuinstallation – WowVision {0} wird hier installiert.",
+            ["target.movedFromBeta"]   = "Neuer Ordner seit dem Ende der Beta – WowVision {0} wird hier installiert.",
             ["target.upToDate"]        = "Aktuell – WowVision {0} ist installiert.",
             ["target.updateAvailable"] = "Aktualisierung verfügbar – WowVision {0} ist installiert, {1} ist verfügbar.",
             ["target.versionUnknown"]  = "(Version unbekannt)",
@@ -628,6 +630,7 @@ namespace WowVisionInstaller
             // ── état par version du jeu (InstallTarget.StatusLine) ───────────
             ["target.notFound"]        = "Introuvable sur cet ordinateur — cochez-la quand même et indiquez le dossier à l'étape suivante.",
             ["target.freshInstall"]    = "Nouvelle installation — WowVision {0} sera installé ici.",
+            ["target.movedFromBeta"]   = "Nouveau dossier depuis la fin de la bêta — WowVision {0} sera installé ici.",
             ["target.upToDate"]        = "À jour — WowVision {0} est installé.",
             ["target.updateAvailable"] = "Mise à jour disponible — WowVision {0} est installé, {1} est disponible.",
             ["target.versionUnknown"]  = "(version inconnue)",

@@ -308,6 +308,31 @@ namespace WowVisionInstaller
                       T(Config.MistsFlavor).HasTestBuild && !T(Config.MistsFlavor).UpdateAvailable);
                 Check("Retail without WowVision -> fresh install", T(Config.RetailFlavor).ClientFound && !T(Config.RetailFlavor).HasAddon);
 
+                Console.WriteLine("=== WoW Forever out of its beta folder ===");
+                {
+                    string betaDir = Path.Combine(wow.Base, Config.ForeverBetaFolder);
+                    string betaAddOns = Path.Combine(betaDir, "Interface", "AddOns");
+                    Directory.CreateDirectory(Path.Combine(betaAddOns, Config.PrimaryFolder));
+                    File.WriteAllText(Path.Combine(betaDir, ".flavor.info"), "Product Flavor!STRING:0\r\n" + Config.ForeverFlavor + "\r\n");
+                    File.WriteAllText(Path.Combine(betaDir, "WowB.exe"), "x");
+                    string liveAddOns = wow.AddOns[Config.ForeverFlavor];
+                    Directory.Delete(Path.Combine(liveAddOns, Config.PrimaryFolder), true);
+                    PathMemory.Remember(Config.ForeverFlavor, betaAddOns);
+
+                    var fv = InstallTarget.BuildAll().Find(t => t.Product == Config.ForeverFlavor);
+                    Console.WriteLine($"    Forever: {fv.AddOnsPath}: {fv.StatusLine()}");
+                    Check("a remembered beta folder gives way to the live client beside it",
+                          string.Equals(fv.AddOnsPath, liveAddOns, StringComparison.OrdinalIgnoreCase));
+                    Check("the live client counts as moved from the beta", fv.MovedFromBeta && !fv.HasAddon && fv.CarriesWowVision);
+                    Check("its status line says so", fv.StatusLine() == Loc.Format("target.movedFromBeta", Config.LatestVersion));
+
+                    Directory.Delete(betaDir, true);
+                    PathMemory.Remember(Config.ForeverFlavor, liveAddOns);
+                    fv = InstallTarget.BuildAll().Find(t => t.Product == Config.ForeverFlavor);
+                    Check("without the beta folder an empty Forever is a fresh install", !fv.MovedFromBeta && !fv.CarriesWowVision);
+                    wow.PutWowVision(Config.ForeverFlavor, "V0.9.0");
+                }
+
                 Console.WriteLine("=== developer junction ===");
                 string devCheckout = Path.Combine(wow.Root, "checkout", "WowVision");
                 Directory.CreateDirectory(devCheckout);

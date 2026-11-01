@@ -64,7 +64,7 @@ namespace WowVisionInstaller
         private List<InstallTarget> Found => _targets.FindAll(t => t.ClientFound);
 
         /// <summary>Clients that already have WowVision.</summary>
-        private List<InstallTarget> WithAddon => _targets.FindAll(t => t.HasAddon);
+        private List<InstallTarget> WithAddon => _targets.FindAll(t => t.CarriesWowVision);
 
         /// <summary>
         /// What "Update now" acts on: the clients that already have WowVision, or —

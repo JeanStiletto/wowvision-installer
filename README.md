@@ -35,7 +35,11 @@ read back line by line.
 Offered in this order. For each: the folder, the TOC it reads, the interface
 numbers that belong to it.
 
-- WoW Forever: `_classic_beta_`, `WowVision_Camelot.toc`, 16000 to 19999.
+- WoW Forever: `_forever_` (product `wowf`; the beta was `_classic_beta_`),
+  `WowVision_Camelot.toc`, 16000 to 19999. When `_forever_` has no WowVision
+  yet but `_classic_beta_` beside it does, the live folder is ticked and in
+  "Update now" (the game moved there when the beta ended), and a folder
+  remembered from the beta gives way to it.
 - Anniversary (TBC): `_anniversary_`, `WowVision_TBC.toc`, 20000 to 29999.
 - Classic Era (Vanilla): `_classic_era_`, `WowVision_Vanilla.toc`, 10000 to 15999.
 - Mists of Pandaria Classic: `_classic_`, `WowVision_Mists.toc`, 50000 to 59999.

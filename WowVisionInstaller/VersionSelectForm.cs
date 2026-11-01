@@ -47,10 +47,11 @@ namespace WowVisionInstaller
                     Location = new Point(ContentLeft, y),
                     Size = new Size(ContentWidth, 24),
                     Font = new Font(Font.FontFamily, 9.5f, FontStyle.Bold),
-                    // Default: tick the clients that already have WowVision. If
-                    // none do, this is a first install and we pre-tick every client
-                    // we actually found, which is the overwhelmingly common intent.
-                    Checked = t.HasAddon || (!AnyTargetHasAddon() && t.ClientFound),
+                    // Default: tick the clients that already have WowVision (and
+                    // WoW Forever moved out of its beta folder). If none do, this
+                    // is a first install and we pre-tick every client we actually
+                    // found, which is the overwhelmingly common intent.
+                    Checked = t.CarriesWowVision || (!AnyTargetHasAddon() && t.ClientFound),
                 };
                 check.CheckedChanged += (s, e) => RefreshAccessibleNames();
                 Controls.Add(check);

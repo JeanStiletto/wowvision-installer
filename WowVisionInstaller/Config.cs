@@ -215,6 +215,9 @@ namespace WowVisionInstaller
         /// <summary>Flavor folder of the WoW Forever beta (ended 2026-10-21).</summary>
         public const string ForeverBetaFolder = "_classic_beta_";
 
+        /// <summary>Flavor folder of the live WoW Forever client, since the beta ended.</summary>
+        public const string ForeverLiveFolder = "_forever_";
+
         /// <summary>A product token as read from disk, as the installer uses it.</summary>
         public static string NormalizeProduct(string token) =>
             string.Equals(token, ForeverLiveFlavor, System.StringComparison.OrdinalIgnoreCase) ? ForeverFlavor : token;

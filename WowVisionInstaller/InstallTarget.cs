@@ -52,6 +52,18 @@ namespace WowVisionInstaller
         /// <summary>True when this client is present on the machine at all.</summary>
         public bool ClientFound => !string.IsNullOrEmpty(AddOnsPath);
 
+        /// <summary>
+        /// WoW Forever only: the live client (_forever_) has no WowVision yet, but
+        /// the beta folder beside it (_classic_beta_) does. The game moved when the
+        /// beta ended (2026-10-21); this is the player's Forever, not a game version
+        /// they chose to leave out, so it is ticked by default and "Update now"
+        /// installs into it.
+        /// </summary>
+        public bool MovedFromBeta;
+
+        /// <summary>A client "Update now" acts on: WowVision is in it, or it is Forever moved out of the beta.</summary>
+        public bool CarriesWowVision => HasAddon || MovedFromBeta;
+
         /// <summary>True when the installed build is a test build (see <see cref="AddonInstaller.IsTestBuild"/>).</summary>
         public bool HasTestBuild => HasAddon && AddonInstaller.IsTestBuild(InstalledVersion);
 
@@ -136,7 +148,7 @@ namespace WowVisionInstaller
                 return Loc.Get("target.notFound");
 
             if (!HasAddon)
-                return Loc.Format("target.freshInstall", Config.LatestVersion);
+                return Loc.Format(MovedFromBeta ? "target.movedFromBeta" : "target.freshInstall", Config.LatestVersion);
 
             string installed = string.IsNullOrEmpty(InstalledVersion) || InstalledVersion.Contains("@")
                 ? Loc.Get("target.versionUnknown")
@@ -189,6 +201,20 @@ namespace WowVisionInstaller
                 // uninstalled game falls back to detection instead of sending the
                 // install somewhere dead.
                 string remembered = PathMemory.ResolveFor(product);
+
+                // A Forever folder remembered from the beta gives way to the live
+                // client beside it: the game left _classic_beta_ when the beta ended.
+                if (remembered != null && product == Config.ForeverFlavor)
+                {
+                    string live = WowLocator.SiblingAddOns(remembered, Config.ForeverLiveFolder);
+                    if (live != null && WowLocator.ProductForAddOnsFolder(live) == Config.ForeverFlavor)
+                    {
+                        Logger.Info($"Remembered folder for {product} is the beta's ({remembered}); " +
+                                    $"using the live client beside it: {live}");
+                        remembered = live;
+                    }
+                }
+
                 if (remembered != null &&
                     !string.Equals(remembered, t.AddOnsPath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -196,6 +222,14 @@ namespace WowVisionInstaller
                                 $"(detection said {t.AddOnsPath ?? "(nothing)"})");
                     t.AddOnsPath = remembered;
                     t.AutoDetected = false;
+                }
+
+                if (product == Config.ForeverFlavor && t.ClientFound && !t.HasAddon)
+                {
+                    string beta = WowLocator.SiblingAddOns(t.AddOnsPath, Config.ForeverBetaFolder);
+                    t.MovedFromBeta = beta != null && AddonInstalled(beta);
+                    if (t.MovedFromBeta)
+                        Logger.Info($"WoW Forever: WowVision is in the beta folder {beta}, not yet in {t.AddOnsPath}.");
                 }
 
                 t.RefreshInstalledVersion();
