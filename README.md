@@ -197,11 +197,19 @@ exit):
 
 ## The NVDA voice bridge
 
-`payload\sapi2sr-payload.zip` is byte for byte the bridge the Sku installer
-ships. Both installers write the same `Program Files\SAPI2SR` folders and
-register the same voice, so they never disagree as long as the payloads stay
-identical. Its signing script keeps its Sku name because it sits inside that
-shared payload.
+`payload\sapi2sr-payload.zip` is the bridge the Sku installer ships. Both
+installers write the same `Program Files\SAPI2SR` folders and register the
+same voice, so they never disagree as long as the payloads stay identical.
+Its signing script keeps its Sku name because it sits inside that shared
+payload.
+
+**Ahead of Sku since 1.4:** the x64 engine (`x64\sapi2sr_engine.dll`) skips
+text fragments at volume 0, as a real voice plays them silent (source and an
+offline test: `payload\bridge-src\`). WowVision's group health monitor gates
+its spoken copies by volume, so on NVDA it reads only the audible one. The
+signing script pins the new engine as well as the old one. Until the same
+engine and pin reach Sku's payload, whichever installer ran last decides
+which engine is installed.
 
 Since 2026-10-28 the payload carries the bridge's speech history (source:
 `dev/rework-docs/nvda-voice-signing/speech-history` in the Sku repo). Its
