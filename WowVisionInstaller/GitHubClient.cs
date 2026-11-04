@@ -52,6 +52,13 @@ namespace WowVisionInstaller
         /// </summary>
         public static void ResolveAndAdoptLatestRelease()
         {
+            // Off the calling thread: the components page calls this from a window,
+            // and the lookup's awaits would wait for that same thread to come back.
+            Task.Run(() => ResolveAndAdopt()).GetAwaiter().GetResult();
+        }
+
+        private static void ResolveAndAdopt()
+        {
             if (Config.CurrentChannel == Channel.Beta)
             {
                 ResolveAndAdoptBeta();

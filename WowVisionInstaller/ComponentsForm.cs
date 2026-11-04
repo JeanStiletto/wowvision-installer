@@ -29,7 +29,7 @@ namespace WowVisionInstaller
         private ComboBox _channelCombo;
 
         // Combo order == this array.
-        private static readonly Channel[] _channelOrder = { Channel.Beta, Channel.Stable };
+        private static readonly Channel[] _channelOrder = { Channel.Stable, Channel.Beta };
         private CheckBox _forceCheck, _shortcutCheck, _sapi2srCheck, _windowsVoicesCheck, _loginToolCheck;
         private Label _forceDesc, _shortcutDesc, _sapi2srDesc, _windowsVoicesDesc, _loginToolDesc;
         private Label _managedLabel;

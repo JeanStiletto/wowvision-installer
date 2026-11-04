@@ -99,9 +99,9 @@ the extra addons "Update now" would update or install, per client.
 
 One choice for all game versions, on the components page ("Which WowVision"),
 remembered in `%LOCALAPPDATA%\WowVisionUpdater\WowVisionChannel.txt` so
-"Update now" keeps following it. Beta is preselected while WowVision changes
-this fast; `Config.DefaultChannel` switches the default to stable later. The
-opening screen says which one the installer follows.
+"Update now" keeps following it. Stable is preselected
+(`Config.DefaultChannel`). The opening screen says which one the installer
+follows.
 
 - Stable: the newest numbered release, found from the redirect of
   `github.com/wow-vision/WowVision/releases/latest`. Release numbers are

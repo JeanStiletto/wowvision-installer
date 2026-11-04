@@ -81,9 +81,9 @@ namespace WowVisionInstaller
 
         // ── which WowVision: stable release or beta ─────────────────────────
         // One decision for every game version, made on the components page and
-        // remembered (ChannelPrefs). Beta is preselected while the addon changes
-        // this fast; switch DefaultChannel to Stable once the releases catch up.
-        public const Channel DefaultChannel = Channel.Beta;
+        // remembered (ChannelPrefs). Stable is preselected; a choice already
+        // remembered stays as it is.
+        public const Channel DefaultChannel = Channel.Stable;
 
         /// <summary>The channel this run works with (set from ChannelPrefs at startup).</summary>
         public static Channel CurrentChannel { get; private set; } = DefaultChannel;
@@ -106,7 +106,7 @@ namespace WowVisionInstaller
         // exactly when the packager uploads a new zip
         // (GitHubClient.ResolveBetaBuildAsync). That id is LatestBuild; the
         // manifest records the id of the zip each folder came from.
-        public const string FallbackTag = "V0.9.0";
+        public const string FallbackTag = "V1.0.0";
 
         /// <summary>The release tag the installer works with, e.g. "V0.9.0" or "beta".</summary>
         public static string LatestTag { get; private set; } = DefaultChannel == Channel.Beta ? BetaTag : FallbackTag;

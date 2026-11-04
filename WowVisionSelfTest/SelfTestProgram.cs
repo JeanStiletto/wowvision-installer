@@ -60,6 +60,7 @@ namespace WowVisionInstaller
                 case "selfupdate":      RunSelfUpdateTest(arg1 ?? "0.1"); break;
                 case "selfupdateproof": RunSelfUpdateProof(); break;
                 case "versionfile":     RunVersionFileTest(arg1); break;
+                case "channelswitch":   RunChannelSwitchTest(); break;
                 case "swaptest":        RunSwapTest(arg1 == "child"); return;
                 case "offline":
                     // Everything that needs no network, in one go.
@@ -88,6 +89,7 @@ namespace WowVisionInstaller
                     Console.WriteLine("  selfupdateproof  the hash check accepts the right exe and refuses wrong ones");
                     Console.WriteLine("  versionfile [p]  parse dist\\installer-version.txt as the installer would");
                     Console.WriteLine("  swaptest         a running exe can be renamed aside and replaced");
+                    Console.WriteLine("  channelswitch    changing the channel on a window's thread does not hang (looks the release up online)");
                     Console.WriteLine("  flavors          list the WoW clients on this machine (read only)");
                     return;
             }
@@ -95,6 +97,36 @@ namespace WowVisionInstaller
             Console.WriteLine();
             Console.WriteLine(_fails == 0 ? "RESULT: ALL PASS" : $"RESULT: {_fails} FAILURE(S)");
             if (_fails > 0) Environment.ExitCode = 1;
+        }
+
+        /// <summary>A window's thread while it waits: what is posted to it never runs.</summary>
+        private sealed class BlockedWindowContext : SynchronizationContext
+        {
+            public override void Post(SendOrPostCallback d, object state) { }
+        }
+
+        /// <summary>
+        /// The components page changes the channel on the window's thread and
+        /// waits there for the release lookup. The lookup must not need that
+        /// thread to finish, or the page hangs on Install.
+        /// </summary>
+        private static void RunChannelSwitchTest()
+        {
+            Console.WriteLine("=== changing the channel on a window's thread ===");
+            foreach (var channel in new[] { Channel.Beta, Channel.Stable })
+            {
+                var finished = new ManualResetEventSlim();
+                var thread = new Thread(() =>
+                {
+                    SynchronizationContext.SetSynchronizationContext(new BlockedWindowContext());
+                    Config.SetChannel(channel);
+                    GitHubClient.ResolveAndAdoptLatestRelease();
+                    finished.Set();
+                });
+                thread.IsBackground = true;
+                thread.Start();
+                Check("switching to " + channel + " finishes", finished.Wait(TimeSpan.FromSeconds(30)));
+            }
         }
 
         private static void Check(string label, bool ok)
@@ -462,7 +494,7 @@ namespace WowVisionInstaller
                 Check("beta survives a reload", ChannelPrefs.Load() == Channel.Beta);
             }
             finally { ChannelPrefs.DirOverride = null; try { Directory.Delete(store, true); } catch { } }
-            Check("beta is preselected", Config.DefaultChannel == Channel.Beta);
+            Check("stable is preselected", Config.DefaultChannel == Channel.Stable);
 
             Console.WriteLine("=== beta build id from the download redirect ===");
             Check("asset id read from the storage URL",

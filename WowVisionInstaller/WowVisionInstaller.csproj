@@ -46,7 +46,7 @@
          1.4 = the NVDA voice bridge keeps silent parts silent: its x64 engine
          skips text at volume 0, as a real voice does (WowVision's group health
          monitor on NVDA reads only the audible part). -->
-    <Version>1.4</Version>
+    <Version>1.5</Version>
     <!-- File properties (Explorer "Details", and what antivirus reputation
          scoring reads). The exe is NOT Authenticode-signed (no paid
          certificate), so this is the only identity it carries. -->
