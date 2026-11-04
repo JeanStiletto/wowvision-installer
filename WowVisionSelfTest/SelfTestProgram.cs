@@ -496,6 +496,14 @@ namespace WowVisionInstaller
             finally { ChannelPrefs.DirOverride = null; try { Directory.Delete(store, true); } catch { } }
             Check("stable is preselected", Config.DefaultChannel == Channel.Stable);
 
+            Console.WriteLine("=== side files of a self-update ===");
+            Check("the updater keeps its names",
+                  SelfUpdater.SideFileName(@"C:\x\WowVisionUpdater.exe", "old") == "WowVisionUpdater.old.exe");
+            Check("a numbered download gets its own",
+                  SelfUpdater.SideFileName(@"C:\x\WowVisionInstaller (1).exe", "new") == "WowVisionInstaller (1).new.exe");
+            Check("every launch checks for an update", SelfUpdater.ShouldCheck(new string[0]));
+            Check("the switch still turns it off", !SelfUpdater.ShouldCheck(new[] { SelfUpdater.SkipSwitch }));
+
             Console.WriteLine("=== beta build id from the download redirect ===");
             Check("asset id read from the storage URL",
                   GitHubClient.BuildIdFromUri(new Uri("https://release-assets.githubusercontent.com/github-production-release-asset/1109589856/b107f80f-951a-488f-b57b-7e410cd0b074?sp=r")) ==
@@ -1230,10 +1238,10 @@ namespace WowVisionInstaller
             {
                 string running = System.Reflection.Assembly.GetExecutingAssembly().Location;
                 string dir = Path.GetDirectoryName(running) ?? "";
-                string staged = Path.Combine(dir, "WowVisionUpdater.new.exe");
+                string staged = Path.Combine(dir, SelfUpdater.SideFileName(running, "new"));
                 File.Copy(running, staged, overwrite: true);
                 SelfUpdater.Apply(staged);
-                bool ok = File.Exists(running) && File.Exists(Path.Combine(dir, "WowVisionUpdater.old.exe")) && !File.Exists(staged);
+                bool ok = File.Exists(running) && File.Exists(Path.Combine(dir, SelfUpdater.SideFileName(running, "old"))) && !File.Exists(staged);
                 Console.WriteLine(ok ? "    CHILD-PASS" : "    CHILD-FAIL");
                 return;
             }
@@ -1245,7 +1253,10 @@ namespace WowVisionInstaller
             foreach (var f in Directory.GetFiles(Path.GetDirectoryName(self) ?? ""))
                 File.Copy(f, Path.Combine(sandbox, Path.GetFileName(f)), overwrite: true);
 
-            var psi = new ProcessStartInfo(Path.Combine(sandbox, Path.GetFileName(self)), "swaptest child")
+            // Under a name like a second download's, with a space and brackets.
+            string numbered = Path.Combine(sandbox, Path.GetFileNameWithoutExtension(self) + " (1).exe");
+            File.Copy(self, numbered, overwrite: true);
+            var psi = new ProcessStartInfo(numbered, "swaptest child")
             { UseShellExecute = false, RedirectStandardOutput = true, WorkingDirectory = sandbox };
             string output;
             using (var p = Process.Start(psi)) { output = p.StandardOutput.ReadToEnd(); p.WaitForExit(); }

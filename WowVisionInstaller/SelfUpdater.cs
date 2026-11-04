@@ -26,25 +26,23 @@ namespace WowVisionInstaller
     }
 
     /// <summary>
-    /// Keeps the updater itself current.
+    /// Keeps the installer itself current, whichever copy was started.
     ///
-    /// The persistent copy in %LOCALAPPDATA%\WowVisionUpdater (see <see cref="Shortcut"/>)
-    /// is what the "WowVision Updater" shortcut launches, and it can sit there for a year.
+    /// A copy can sit there for a year, whether it is the one the "WowVision Updater"
+    /// shortcut launches (%LOCALAPPDATA%\WowVisionUpdater, see <see cref="Shortcut"/>)
+    /// or the file the user downloaded and keeps running.
     /// WowVision releases are still found — <see cref="GitHubClient.ResolveLatestMainVersionAsync"/>
     /// resolves those live — but fixes to the INSTALLER never reached anyone who had
     /// stopped visiting the download page.
     ///
     /// HOW THE SWAP WORKS. Windows will not let a running .exe be overwritten, but
-    /// it does allow it to be RENAMED. So: rename ourselves to WowVisionUpdater.old.exe,
-    /// move the freshly downloaded file into our own name, start it, exit. The next
+    /// it does allow it to be RENAMED. So: rename ourselves to "name.old.exe" beside
+    /// us, move the freshly downloaded file into our own name, start it, exit. The next
     /// launch deletes the .old. No helper process, no batch file, no waiting on a
     /// process id — which is what every other approach spends its complexity on.
     ///
     /// WHAT IT REFUSES TO DO.
-    ///   - It only ever self-updates the PERSISTENT copy. The exe the user just
-    ///     downloaded into Downloads is by definition the newest one the website
-    ///     serves, and silently rewriting a file in someone's Downloads folder is
-    ///     not ours to do.
+    ///   - It only asks first: the user chooses whether the file is replaced.
     ///   - It never runs an unverified binary: the published SHA-256 must match,
     ///     and the downloaded file's own version resource must be newer than ours.
     ///     Any mismatch aborts the swap.
@@ -71,8 +69,14 @@ namespace WowVisionInstaller
         /// <summary>Asset holding the published installer version + hash.</summary>
         public const string VersionAssetName = "installer-version.txt";
 
-        private const string BackupName = "WowVisionUpdater.old.exe";
-        private const string StagingName = "WowVisionUpdater.new.exe";
+        // Named after the exe itself: several copies can share a folder, such as
+        // "WowVisionInstaller (1).exe" and "(2)" in Downloads.
+        private static string BackupName => SideFileName(RunningExe, "old");
+        private static string StagingName => SideFileName(RunningExe, "new");
+
+        /// <summary>The name of a swap's side file: "name.exe" gives "name.old.exe".</summary>
+        public static string SideFileName(string exePath, string kind) =>
+            Path.GetFileNameWithoutExtension(exePath) + "." + kind + ".exe";
 
         /// <summary>
         /// Set on the run that follows a successful self-update, so the opening
@@ -98,13 +102,6 @@ namespace WowVisionInstaller
                 PostUpdateNotice = Loc.Format("selfupdate.done", RunningVersion);
                 Logger.Info($"Restarted after a self-update; now running {RunningVersion}.");
             }
-
-            // Only ever tidy up our OWN folder. Run from Downloads, the names
-            // below would point at somebody else's directory, and deleting files
-            // there because they happen to match a name we chose is not a licence
-            // we have.
-            if (!string.Equals(RunningExe, Shortcut.PersistentExe, StringComparison.OrdinalIgnoreCase))
-                return;
 
             // A download that was cancelled or died leaves its staging file
             // behind. Harmless, but it is an executable sitting in the user's
@@ -140,8 +137,7 @@ namespace WowVisionInstaller
 
         /// <summary>
         /// Whether a self-update check makes sense at all for this launch: not
-        /// suppressed on the command line, and running from the persistent copy
-        /// rather than from wherever the user downloaded the exe to.
+        /// suppressed on the command line, and not the run right after an update.
         /// </summary>
         public static bool ShouldCheck(string[] args)
         {
@@ -153,13 +149,6 @@ namespace WowVisionInstaller
 
             if (HasSwitch(args, UpdatedSwitch))
                 return false;   // we ARE the update; do not immediately look again
-
-            string running = RunningExe;
-            if (!string.Equals(running, Shortcut.PersistentExe, StringComparison.OrdinalIgnoreCase))
-            {
-                Logger.Info($"Not the persistent copy ({running}); skipping the self-update check.");
-                return false;
-            }
 
             return true;
         }

@@ -25,8 +25,9 @@ from Sku as they are.
    own voice list, which every SAPI program then offers, so only a player who
    ticks them gets them, and "Update now" never runs them.
 9. Puts a copy of itself in `%LOCALAPPDATA%\WowVisionUpdater` with a desktop and
-   Start menu shortcut "WowVision Updater". Run later, that copy is the updater:
-   it first updates itself, then WowVision.
+   Start menu shortcut "WowVision Updater". Run later, that copy is the updater.
+   Any copy, a kept download too, first offers to update itself, replacing
+   its own file, then updates WowVision.
 
 Everything is spoken: every page announces itself, progress is announced at
 milestones and every 10 seconds during the download, and the event log can be
