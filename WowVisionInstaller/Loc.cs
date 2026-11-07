@@ -126,6 +126,9 @@ namespace WowVisionInstaller
             ["done.closeAcc"]        = "Close the installer",
             ["done.logBtn"]          = "View &event log",
             ["done.logAcc"]          = "View the event log — every step of this run, line by line",
+            ["done.manualBtn"]       = "Open the WowVision &manual",
+            ["done.manualAcc"]       = "Open the WowVision manual in your browser — getting started, keys and troubleshooting",
+            ["done.manualFailed"]    = "The browser could not be opened. The manual is at {0}",
             ["done.logHint"]         = "Event log. Use the arrow keys to go through the steps; the Close button ends the installer.",
 
             // ── per-client status lines (InstallTarget.StatusLine) ───────────
@@ -375,6 +378,9 @@ namespace WowVisionInstaller
             ["done.closeAcc"]        = "Den Installer schließen",
             ["done.logBtn"]          = "&Ereignisprotokoll anschauen",
             ["done.logAcc"]          = "Ereignisprotokoll anschauen – jeder Schritt dieses Durchgangs, Zeile für Zeile",
+            ["done.manualBtn"]       = "WowVision-&Anleitung öffnen",
+            ["done.manualAcc"]       = "Die WowVision-Anleitung im Browser öffnen – erste Schritte, Tasten und Problemlösung",
+            ["done.manualFailed"]    = "Der Browser konnte nicht geöffnet werden. Die Anleitung steht unter {0}",
             ["done.logHint"]         = "Ereignisprotokoll. Mit den Pfeiltasten durch die Schritte gehen; die Schaltfläche „Schließen“ beendet den Installer.",
 
             // ── Statuszeilen je Spielversion ─────────────────────────────────
@@ -625,6 +631,9 @@ namespace WowVisionInstaller
             ["done.closeAcc"]        = "Fermer l'installateur",
             ["done.logBtn"]          = "Afficher le &journal des événements",
             ["done.logAcc"]          = "Afficher le journal des événements — chaque étape de cette exécution, ligne par ligne",
+            ["done.manualBtn"]       = "Ouvrir le &manuel de WowVision (en anglais)",
+            ["done.manualAcc"]       = "Ouvrir le manuel de WowVision dans le navigateur, en anglais — premiers pas, touches et dépannage",
+            ["done.manualFailed"]    = "Le navigateur n'a pas pu être ouvert. Le manuel se trouve à l'adresse {0}",
             ["done.logHint"]         = "Journal des événements. Utilisez les flèches pour parcourir les étapes ; le bouton Fermer quitte l'installateur.",
 
             // ── état par version du jeu (InstallTarget.StatusLine) ───────────

@@ -624,6 +624,13 @@ namespace WowVisionInstaller
             if (broken.Count > 0) Console.WriteLine("    unformattable: " + string.Join(", ", broken));
             Check("every text formats", broken.Count == 0);
 
+            // The manual exists in English and German only.
+            Check("manual link: English page for English",
+                  Config.ManualUrl(Lang.En) == Config.ManualSite + "en/getting-started/introduction.html");
+            Check("manual link: German page for German",
+                  Config.ManualUrl(Lang.De) == Config.ManualSite + "de/getting-started/introduction.html");
+            Check("manual link: English page for French", Config.ManualUrl(Lang.Fr) == Config.ManualUrl(Lang.En));
+
             // Every key the code asks for exists (scanned from the sources when
             // the harness runs inside the repo).
             string src = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\..\WowVisionInstaller"));
