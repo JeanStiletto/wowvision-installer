@@ -774,6 +774,39 @@ namespace WowVisionInstaller
                     Check($"{p.Key}: pin {pinFile} reads as {p.PinVersion}",
                           m.Success && m.Groups[1].Value == p.PinVersion);
                 }
+
+            Console.WriteLine("=== cursetest: a failed lookup is said to the player ===");
+            var lang = Loc.Current;
+            Loc.Set(Lang.En);
+            var all = ManagedAddons.Entries.ToDictionary(e => e.PrefKey, e => true);
+            var forever = new[] { Config.ForeverFlavor };
+            var details = ManagedAddons.Entries.Find(e => e.PrefKey == "ManageDetails").Packages[0];
+
+            ManagedAddons.SeedPins();   // nothing looked up: every lookup counts as failed
+            string notice = ManagedAddons.LookupFailureNotice(all, forever);
+            Check("no lookup: the notice names Details with its built-in version",
+                  notice != null && notice.Contains("Details Damage Meter (built-in " + details.PinVersion + ")"));
+            Check("no lookup: both sources are named", notice != null &&
+                  notice.Contains("CurseForge") && notice.Contains("GitHub"));
+            var noDetails = new Dictionary<string, bool>(all) { ["ManageDetails"] = false };
+            string without = ManagedAddons.LookupFailureNotice(noDetails, forever);
+            Check("an addon switched off is not named", without != null && !without.Contains("Details"));
+            Check("no client with extra addons: no notice",
+                  ManagedAddons.LookupFailureNotice(all, new string[0]) == null);
+
+            foreach (var e in ManagedAddons.Entries)
+                foreach (var p in e.Packages)
+                    if (!string.IsNullOrEmpty(p.GitHubRepo))
+                        ManagedAddons.SetResolved(new ResolvedManagedPackage { Package = p, Version = p.PinVersion, Url = p.PinUrl });
+            notice = ManagedAddons.LookupFailureNotice(all, forever);
+            Check("only CurseForge failed: only CurseForge is named", notice != null &&
+                  notice.Contains("CurseForge") && !notice.Contains("GitHub") && !notice.Contains("Questie"));
+
+            foreach (var e in ManagedAddons.Entries)
+                foreach (var p in e.Packages)
+                    ManagedAddons.SetResolved(new ResolvedManagedPackage { Package = p, Version = p.PinVersion, Url = p.PinUrl });
+            Check("every lookup worked: no notice", ManagedAddons.LookupFailureNotice(all, forever) == null);
+            Loc.Set(lang);
         }
 
         private static void RunCurseLive()

@@ -105,6 +105,14 @@ namespace WowVisionInstaller
         public string Url;
         public string Sha256;    // null when the source is live (github release or CurseForge file)
         public long ExpectedLength;   // the size CurseForge lists for a live file; 0 = not checked
+
+        /// <summary>
+        /// "CurseForge" or "GitHub" when this package follows that source but the
+        /// lookup of its newest release failed this run (blocked, offline, too
+        /// slow), so the baked-in pin is used instead. Null when the lookup worked
+        /// or the package follows no source.
+        /// </summary>
+        public string LookupFailedSource;
     }
 
     /// <summary>
@@ -403,12 +411,7 @@ namespace WowVisionInstaller
         /// </summary>
         public static void ResolveAll(GitHubClient github, TimeSpan timeout)
         {
-            foreach (var entry in Entries)
-                foreach (var pkg in entry.Packages)
-                    _resolved[pkg.Key] = new ResolvedManagedPackage
-                    {
-                        Package = pkg, Version = pkg.PinVersion, Url = pkg.PinUrl, Sha256 = pkg.PinSha256,
-                    };
+            SeedPins();
 
             var tasks = new List<Task>();
             foreach (var entry in Entries)
@@ -431,7 +434,7 @@ namespace WowVisionInstaller
                                 Url = isPin ? p.PinUrl : CurseForge.DownloadUrl(f.Id, f.FileName),
                                 Sha256 = isPin ? p.PinSha256 : null,
                             };
-                            lock (_resolved) _resolved[p.Key] = r;
+                            SetResolved(r);
                             Logger.Info($"{p.Key}: newest CurseForge file {f.FileName} (project {p.CurseProjectId}).");
                         }));
                         continue;
@@ -450,7 +453,7 @@ namespace WowVisionInstaller
                             Url = $"https://github.com/{p.GitHubRepo}/releases/download/" +
                                   $"{Uri.EscapeDataString(tag)}/{Uri.EscapeDataString(asset)}",
                         };
-                        lock (_resolved) _resolved[p.Key] = r;
+                        SetResolved(r);
                         Logger.Info($"{p.Key}: latest release {tag} on {p.GitHubRepo}.");
                     }));
                 }
@@ -458,6 +461,67 @@ namespace WowVisionInstaller
 
             try { Task.WaitAll(tasks.ToArray(), timeout); }
             catch (Exception ex) { Logger.Warning($"Managed addon resolution: {ex.Message}"); }
+
+            lock (_resolved)
+                foreach (var r in _resolved.Values)
+                    if (r.LookupFailedSource != null)
+                        Logger.Warning($"{r.Package.Key}: newest release not found on {r.LookupFailedSource}; " +
+                                       $"using the built-in version {r.Version}.");
+        }
+
+        /// <summary>
+        /// Every package on its pin, each one with a live source marked as not
+        /// looked up yet; a lookup that succeeds replaces its package's entry.
+        /// </summary>
+        internal static void SeedPins()
+        {
+            lock (_resolved)
+                foreach (var entry in Entries)
+                    foreach (var pkg in entry.Packages)
+                        _resolved[pkg.Key] = new ResolvedManagedPackage
+                        {
+                            Package = pkg, Version = pkg.PinVersion, Url = pkg.PinUrl, Sha256 = pkg.PinSha256,
+                            LookupFailedSource = LiveSource(pkg),
+                        };
+        }
+
+        /// <summary>Records where one package resolved to this run.</summary>
+        internal static void SetResolved(ResolvedManagedPackage r)
+        {
+            lock (_resolved) _resolved[r.Package.Key] = r;
+        }
+
+        /// <summary>Where a package looks up its newest release, or null for a pin-only package.</summary>
+        internal static string LiveSource(ManagedPackage pkg) =>
+            pkg.CurseProjectId > 0 ? "CurseForge" :
+            !string.IsNullOrEmpty(pkg.GitHubRepo) ? "GitHub" : null;
+
+        /// <summary>
+        /// One sentence for the player when the newest release of a wanted extra
+        /// addon could not be looked up and its built-in version is used instead,
+        /// e.g. "Could not check online for newer versions of: Details (built-in
+        /// 20261109.15410.172). CurseForge did not answer. …"; null when every
+        /// lookup worked. Only entries that are switched on and exist for one of
+        /// <paramref name="products"/> count. Said whether or not anything is
+        /// installed this run: a player kept on an old pin hears it every time.
+        /// </summary>
+        public static string LookupFailureNotice(IDictionary<string, bool> enabled, IEnumerable<string> products)
+        {
+            var productList = products.Distinct().ToList();
+            var names = new List<string>();
+            var sources = new List<string>();
+            foreach (var entry in Entries)
+            {
+                if (!enabled.TryGetValue(entry.PrefKey, out bool on) || !on) continue;
+                var failed = productList.SelectMany(p => PackagesFor(entry, p)).Distinct()
+                                        .Select(Resolved).Where(r => r.LookupFailedSource != null).ToList();
+                if (failed.Count == 0) continue;
+                names.Add($"{entry.DisplayName} ({Loc.Format("managed.builtIn", DisplayVersion(failed[0].Version))})");
+                foreach (var r in failed)
+                    if (!sources.Contains(r.LookupFailedSource)) sources.Add(r.LookupFailedSource);
+            }
+            if (names.Count == 0) return null;
+            return Loc.Format("managed.lookupFailed", string.Join(", ", names), string.Join(", ", sources));
         }
 
         public static ResolvedManagedPackage Resolved(ManagedPackage pkg)
