@@ -48,7 +48,9 @@ namespace WowVisionInstaller
         {
             try
             {
-                var interfaceDir = Directory.GetParent(addonsFolder); // Interface
+                // TrimEnd: GetParent of "...\AddOns\" is AddOns itself, which
+                // would look for WTF inside Interface and skip the settings.
+                var interfaceDir = Directory.GetParent(addonsFolder.TrimEnd('\\', '/')); // Interface
                 var flavor = interfaceDir?.Parent;                    // <flavor>
                 return flavor == null ? null : Path.Combine(flavor.FullName, "WTF");
             }
@@ -151,8 +153,11 @@ namespace WowVisionInstaller
             {
                 if (cv.Scope == CVarScope.Global)
                 {
-                    if (SetCVarInFile(ConfigWtf(addonsFolder), cv.Name, cv.Value))
+                    string file = ConfigWtf(addonsFolder);
+                    if (SetCVarInFile(file, cv.Name, cv.Value, out string error))
                         report?.Invoke(Loc.Format("gs.setGlobal", cv.Name, cv.Value));
+                    else if (error != null)
+                        report?.Invoke(Loc.Format("gs.failed", cv.Name, file, error));
                 }
                 else
                 {
@@ -163,8 +168,12 @@ namespace WowVisionInstaller
                         continue;
                     }
                     foreach (var cache in caches)
-                        if (SetCVarInFile(cache, cv.Name, cv.Value))
+                    {
+                        if (SetCVarInFile(cache, cv.Name, cv.Value, out string error))
                             report?.Invoke(Loc.Format("gs.setAccount", cv.Name, cv.Value));
+                        else if (error != null)
+                            report?.Invoke(Loc.Format("gs.failed", cv.Name, cache, error));
+                    }
                 }
             }
         }
@@ -175,9 +184,12 @@ namespace WowVisionInstaller
         /// <summary>
         /// Idempotent: replace the existing SET line, else append. Creates the
         /// file if missing. Returns true if it actually wrote a change.
+        /// <paramref name="error"/> is set when the write failed (false is then
+        /// a failure, not "already right"), so the caller can say so out loud.
         /// </summary>
-        private static bool SetCVarInFile(string file, string name, string value)
+        private static bool SetCVarInFile(string file, string name, string value, out string error)
         {
+            error = null;
             try
             {
                 string canonical = $"SET {name} \"{value}\"";
@@ -215,6 +227,7 @@ namespace WowVisionInstaller
             catch (Exception ex)
             {
                 Logger.Warning($"Could not set {name} in {file}: {ex.Message}");
+                error = ex.Message.TrimEnd('.', ' ');   // the message adds its own full stop
                 return false;
             }
         }

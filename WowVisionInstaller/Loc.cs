@@ -247,6 +247,7 @@ namespace WowVisionInstaller
             ["gs.setAccount"]        = "Game setting: {0} = {1} (account).",
             ["gs.deferred"]          = "Game setting: {0} will be set after your first login (no account profile yet).",
             ["gs.noWtf"]             = "Game settings: no WTF folder here; skipped.",
+            ["gs.failed"]            = "Game setting: {0} could NOT be written to {1}: {2}. Close the game and run the updater again; if this stays, the file or folder may be read-only.",
 
             // ── SAPI2SR NVDA voice bridge (Sapi2SrInstaller progress) ────────
             ["sapi2sr.installing"]   = "NVDA voice: installing the SAPI2SR bridge…",
@@ -494,6 +495,7 @@ namespace WowVisionInstaller
             ["gs.setAccount"]        = "Spieleinstellung: {0} = {1} (Account).",
             ["gs.deferred"]          = "Spieleinstellung: {0} wird nach deinem ersten Login gesetzt (noch kein Account-Profil vorhanden).",
             ["gs.noWtf"]             = "Spieleinstellungen: kein WTF-Ordner hier; übersprungen.",
+            ["gs.failed"]            = "Spieleinstellung: {0} konnte NICHT in {1} geschrieben werden: {2}. Schließe das Spiel und starte den Updater erneut; bleibt es so, ist die Datei oder der Ordner vielleicht schreibgeschützt.",
 
             // ── NVDA-Sprachbrücke (SAPI2SR) ──────────────────────────────────
             ["sapi2sr.installing"]   = "NVDA-Stimme: installiere die SAPI2SR-Brücke…",
@@ -744,6 +746,7 @@ namespace WowVisionInstaller
             ["gs.setAccount"]        = "Réglage du jeu : {0} = {1} (compte).",
             ["gs.deferred"]          = "Réglage du jeu : {0} sera défini après votre première connexion (pas encore de profil de compte).",
             ["gs.noWtf"]             = "Réglages du jeu : pas de dossier WTF ici ; ignoré.",
+            ["gs.failed"]            = "Réglage du jeu : {0} n'a PAS pu être écrit dans {1} : {2}. Fermez le jeu et relancez le programme de mise à jour ; si cela persiste, le fichier ou le dossier est peut-être en lecture seule.",
 
             // ── passerelle vocale NVDA (SAPI2SR) ─────────────────────────────
             ["sapi2sr.installing"]   = "Voix NVDA : installation de la passerelle SAPI2SR…",

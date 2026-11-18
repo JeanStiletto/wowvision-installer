@@ -287,6 +287,26 @@ namespace WowVisionInstaller
             else
                 notes.Add($"{site.ShortName}: WTF\\Config.wtf not present");
 
+            // Each account's config-cache.wtf holds the account CVars, among them
+            // AllowDangerousScripts, which the installer sets (GameSettings).
+            // Without it a report of "the dangerous-scripts popup still comes"
+            // cannot be checked against what the file really says.
+            string accountRoot = Path.Combine(site.FlavorDir, "WTF", "Account");
+            if (Directory.Exists(accountRoot))
+            {
+                foreach (string accountDir in SafeEnumerateDirs(accountRoot))
+                {
+                    string accountName = Path.GetFileName(accountDir);
+                    if (string.Equals(accountName, "SavedVariables", StringComparison.OrdinalIgnoreCase)) continue;
+                    string cache = Path.Combine(accountDir, "config-cache.wtf");
+                    if (File.Exists(cache))
+                        CopyInto(cache, Path.Combine(clientDir, "accounts", accountName, "config-cache.wtf"),
+                                 result, notes, site.ShortName);
+                    else
+                        notes.Add($"{site.ShortName}: account {accountName} has no config-cache.wtf");
+                }
+            }
+
             // WowVision's TOCs are the authoritative installed version and
             // interface lists — the install manifest can only ever lag them (see
             // InstallTarget). All of them: which one this client loads is itself
@@ -493,30 +513,64 @@ namespace WowVisionInstaller
         }
 
         /// <summary>
-        /// Flush the installer's own log to disk and stage it. The installer's
-        /// Logger keeps its lines in memory and only materialises a file on
-        /// demand — without the forced save the bundle would carry no record of
-        /// what the installer itself just did.
+        /// Stage the installer's own session logs: this run and the runs before
+        /// it (see <see cref="Logger.StartSessionFile"/>), so a player who
+        /// restarted the installer to collect logs still sends the run that went
+        /// wrong. If this run has no session file (it could not be started), its
+        /// lines are written straight from memory instead.
         /// </summary>
         private static void CollectInstallerLog(string staging, Result result, List<string> notes)
         {
             try
             {
-                string installerLog = Logger.SaveIfNeeded(force: true);
-                if (string.IsNullOrEmpty(installerLog) || !File.Exists(installerLog))
+                string dest = Path.Combine(staging, "installer");
+                for (int n = 1; n <= Logger.KeptSessions; n++)
                 {
-                    notes.Add("installer log: nothing was written");
-                    return;
+                    string source = Logger.SessionFile(n);
+                    if (!File.Exists(source)) continue;
+                    if (CopyShared(source, Path.Combine(dest, Path.GetFileName(source)), result, notes))
+                        result.IncludedInstallerLog = true;
                 }
 
-                if (CopyInto(installerLog, Path.Combine(staging, "installer-" + Path.GetFileName(installerLog)),
-                             result, notes, "installer"))
+                if (!Logger.WritingSessionFile)
+                {
+                    string memory = Path.Combine(dest, "installer-this-run-from-memory.log");
+                    Directory.CreateDirectory(dest);
+                    File.WriteAllLines(memory, Logger.Snapshot());
+                    result.FileCount++;
+                    result.TotalBytes += new FileInfo(memory).Length;
                     result.IncludedInstallerLog = true;
+                    notes.Add("installer log: this run has no session file (it could not be started); this run written from memory, " +
+                              "installer-run1.log is then another window's or an older run");
+                }
             }
             catch (Exception ex)
             {
                 Logger.Warning($"[LogCollector] Could not include the installer log: {ex.Message}");
                 notes.Add($"installer log: NOT included ({ex.Message})");
+            }
+        }
+
+        /// <summary>
+        /// Copies a file another handle may still be writing (the installer's own
+        /// running session log): File.Copy refuses a file open for writing.
+        /// </summary>
+        private static bool CopyShared(string source, string dest, Result result, List<string> notes)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (var output = File.Create(dest))
+                    input.CopyTo(output);
+                result.FileCount++;
+                result.TotalBytes += new FileInfo(dest).Length;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                notes.Add($"installer: {Path.GetFileName(source)} could not be copied ({ex.Message})");
+                return false;
             }
         }
 

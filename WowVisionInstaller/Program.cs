@@ -14,6 +14,8 @@ namespace WowVisionInstaller
             Application.SetCompatibleTextRenderingDefault(false);
 
             Loc.Init(); // English/German/French, auto-detected from the OS UI culture
+            // Every run on disk, so a restarted installer can still collect it.
+            Logger.StartSessionFile();
             Logger.Info("WowVision Installer starting…");
             Logger.Info($"Admin: {IsAdmin()}, Lang: {Loc.Current}");
 
