@@ -79,6 +79,14 @@ namespace WowVisionInstaller
 
         public const string SiteUrl = "https://github.com/" + AddonRepo;
 
+        // The WowVision manual (the addon's docs/, on GitHub Pages). The end of a
+        // run offers its Getting Started page in the installer's language; the
+        // manual is English and German, so French gets the English page.
+        public const string ManualSite = "https://wow-vision.github.io/WowVision/user/";
+
+        public static string ManualUrl(Lang lang) =>
+            ManualSite + (lang == Lang.De ? "de" : "en") + "/getting-started/introduction.html";
+
         // ── which WowVision: stable release or beta ─────────────────────────
         // One decision for every game version, made on the components page and
         // remembered (ChannelPrefs). Stable is preselected; a choice already

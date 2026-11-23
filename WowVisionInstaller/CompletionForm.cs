@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -30,6 +31,9 @@ namespace WowVisionInstaller
     /// because it can run to a dozen lines across several clients: a Label is one
     /// opaque blob to a screen reader, whereas a text box can be reviewed line by
     /// line. It is still announced in full on arrival, so reviewing is optional.
+    ///
+    /// The manual button opens the WowVision manual in the browser and leaves this
+    /// window open, so the user can come back to close or read the log.
     /// </summary>
     public class CompletionForm : Form
     {
@@ -42,6 +46,7 @@ namespace WowVisionInstaller
         private Label _headingLabel;
         private TextBox _summaryBox;
         private Button _closeButton;
+        private Button _manualButton;
         private Button _logButton;
 
         public CompletionForm(string summary, bool failed, string headingOverride = null)
@@ -55,7 +60,7 @@ namespace WowVisionInstaller
         private void BuildUi()
         {
             Text = Loc.Get("app.title") + " " + WizardForm.InstallerVersion();
-            ClientSize = new Size(600, 400);
+            ClientSize = new Size(600, 446);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -96,6 +101,16 @@ namespace WowVisionInstaller
             _closeButton.Click += (s, e) => { Choice = CompletionChoice.CloseInstaller; Close(); };
             y += h + gap;
 
+            _manualButton = new Button
+            {
+                Location = new Point(20, y),
+                Size = new Size(w, h),
+                Text = Loc.Get("done.manualBtn"),
+                AccessibleName = Loc.Get("done.manualAcc"),
+            };
+            _manualButton.Click += (s, e) => OpenManual();
+            y += h + gap;
+
             _logButton = new Button
             {
                 Location = new Point(20, y),
@@ -105,7 +120,7 @@ namespace WowVisionInstaller
             };
             _logButton.Click += (s, e) => { Choice = CompletionChoice.ViewLog; Close(); };
 
-            Controls.AddRange(new Control[] { _headingLabel, _summaryBox, _closeButton, _logButton });
+            Controls.AddRange(new Control[] { _headingLabel, _summaryBox, _closeButton, _manualButton, _logButton });
 
             AcceptButton = _closeButton;
             CancelButton = _closeButton;
@@ -119,6 +134,30 @@ namespace WowVisionInstaller
             AccessibleDescription = announce;
             _closeButton.AccessibleDescription = announce;
             ScreenReaderAnnouncer.Announce(this, announce);
+        }
+
+        /// <summary>
+        /// Opens the manual through Explorer rather than straight through the
+        /// shell: the installer runs elevated, and a browser started from here
+        /// would run as administrator too. Explorer hands the link to the user's
+        /// own desktop session, so the browser opens as the user.
+        /// </summary>
+        private void OpenManual()
+        {
+            string url = Config.ManualUrl(Loc.Current);
+            Logger.Info($"Opening the manual: {url}");
+            try
+            {
+                Process.Start(new ProcessStartInfo("explorer.exe", "\"" + url + "\"")
+                {
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"Could not open the manual: {ex.Message}");
+                ScreenReaderAnnouncer.Announce(this, Loc.Format("done.manualFailed", url));
+            }
         }
     }
 }
