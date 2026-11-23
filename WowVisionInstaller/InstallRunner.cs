@@ -215,7 +215,7 @@ namespace WowVisionInstaller
 
         /// <summary>True when any client failed to plan or to install.</summary>
         public static bool AnyFailed(List<TargetResult> results) =>
-            results.Any(r => r.Error != null || r.Plan == null);
+            results.Any(r => r.Error != null || r.Plan == null || r.Plan.ManagedItems.Any(m => m.Failed));
 
         /// <summary>True when at least one client actually has work to do.</summary>
         public static bool HasWork(List<TargetResult> results) =>
@@ -259,10 +259,11 @@ namespace WowVisionInstaller
                         if (_cancel.IsCancellationRequested) { WasCancelled = true; break; }
 
                         SayScoped(Loc.Format("status.installingAddon", managed.Entry.DisplayName), true);
-                        ManagedAddonInstaller.InstallEntryAsync(
+                        bool installed = ManagedAddonInstaller.InstallEntryAsync(
                                 r.Target.AddOnsPath, r.Target.Product, managed.Entry, _github,
                                 manifest, OnProgress, _options.Force, _cancel)
                             .GetAwaiter().GetResult();
+                        managed.Failed = !installed;
                     }
 
                     if (WasCancelled) break;
@@ -477,6 +478,43 @@ namespace WowVisionInstaller
         }
 
         /// <summary>
+        /// The summary's line about one extra addon of one client: installed
+        /// with its version, not made for this client, or not installed. The
+        /// last one used to read "Installed" as well, because the run's own
+        /// answer was thrown away.
+        /// </summary>
+        public static string ManagedSummary(ManagedPlanItem managed, InstallManifest manifest,
+                                            string product, string clientName)
+        {
+            var first = ManagedAddons.PackagesFor(managed.Entry, product).FirstOrDefault();
+            if (first != null && ManagedAddons.KnownUnavailable(manifest, first))
+                return Loc.Format("managed.notForClient", managed.Entry.DisplayName, clientName);
+            if (managed.Failed)
+                return Loc.Format("summary.managedFailed", managed.Entry.DisplayName);
+            string ver = first == null ? "" : (ManagedAddons.Resolved(first).Version ?? "");
+            return Loc.Format("summary.updated", managed.Entry.DisplayName, ManagedAddons.DisplayVersion(ver));
+        }
+
+        /// <summary>
+        /// The summary's lines about one client's game settings, read from the
+        /// files AFTER the run: a setting that is still missing although this
+        /// run set out to write it could not be written, and the summary says
+        /// that and not "adjusted". The first login is the one step the
+        /// installer cannot take, so it is said here, in the text the user is
+        /// left with, not only in a progress line.
+        /// </summary>
+        public static List<string> SettingsSummary(string addonsFolder, bool settingsWereDue)
+        {
+            var lines = new List<string>();
+            var state = GameSettings.State(addonsFolder);
+            if (settingsWereDue)
+                lines.Add(Loc.Get(state == SetupState.CanFinish ? "summary.settingsFailed" : "summary.settings"));
+            if (state == SetupState.NeedsFirstLogin && InstallTarget.AddonInstalled(addonsFolder))
+                lines.Add(Loc.Get("summary.firstLogin"));
+            return lines;
+        }
+
+        /// <summary>
         /// The end-of-run summary: one section per client saying what it got, then
         /// the single next step. Only lines that apply are included, so the message
         /// stays short and truthful and a screen reader reads it top to bottom in
@@ -514,23 +552,12 @@ namespace WowVisionInstaller
                                              Config.SpokenVersion(Config.LatestTag, Config.LatestBuildDate)));
                     var manifest = InstallManifest.Load(r.Target.AddOnsPath);
                     foreach (var managed in r.Plan.ManagedItems)
-                    {
-                        var first = ManagedAddons.PackagesFor(managed.Entry, r.Target.Product).FirstOrDefault();
-                        if (first != null && ManagedAddons.KnownUnavailable(manifest, first))
-                        {
-                            lines.Add(Loc.Format("managed.notForClient", managed.Entry.DisplayName, r.Target.DisplayName));
-                            continue;
-                        }
-                        string ver = first == null ? "" : (ManagedAddons.Resolved(first).Version ?? "");
-                        lines.Add(Loc.Format("summary.updated", managed.Entry.DisplayName,
-                                             ManagedAddons.DisplayVersion(ver)));
-                    }
+                        lines.Add(ManagedSummary(managed, manifest, r.Target.Product, r.Target.DisplayName));
                     if (r.Plan.Items.Count == 0 && r.Plan.ManagedItems.Count == 0)
                         lines.Add(r.Target.HasTestBuild
                             ? Loc.Format("summary.testBuildKept", InstallTarget.Spoken(r.Target.InstalledVersion))
                             : Loc.Get("summary.addonsCurrent"));
-                    if (r.Plan.SettingsNeedWriting)
-                        lines.Add(Loc.Get("summary.settings"));
+                    lines.AddRange(SettingsSummary(r.Target.AddOnsPath, r.Plan.SettingsNeedWriting));
                     if (r.Plan.TocInterfaceNeedsSync)
                         lines.Add(Loc.Format("summary.client", r.Plan.ClientInterface));
                     if (_options.InstallLoginTool && LoginToolInstaller.ClientSupported(r.Target.Product) &&

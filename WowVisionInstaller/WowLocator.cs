@@ -303,8 +303,9 @@ namespace WowVisionInstaller
 
         /// <summary>
         /// Validates a user-picked folder. Accepts the AddOns folder itself, a
-        /// client folder (_anniversary_, _classic_beta_, …) or the WoW base
-        /// folder. Returns the resolved AddOns path or null.
+        /// client folder (_anniversary_, _classic_beta_, …), the WoW base
+        /// folder, or the folder that holds the base folder. Returns the
+        /// resolved AddOns path or null.
         ///
         /// A base folder holds several clients; it resolves to the first one in
         /// <see cref="Clients"/> order that is there. The pages that ask per client
@@ -348,28 +349,56 @@ namespace WowVisionInstaller
                 return AddOnsInFlavor(picked);
 
             // Picked a base folder: the wanted client first, then any supported one.
-            string[] flavorDirs;
-            try { flavorDirs = Directory.GetDirectories(picked, "_*_"); }
-            catch { flavorDirs = new string[0]; }
-            var supported = flavorDirs.Where(IsSupportedFlavor).ToList();
-            if (supported.Count > 0)
-            {
-                string want = supported.FirstOrDefault(d =>
-                    string.Equals(ReadFlavorProduct(d) ?? ProductForFolderName(d), preferredProduct,
-                                  StringComparison.OrdinalIgnoreCase));
-                if (want == null)
-                {
-                    var order = SupportedProducts.ToList();
-                    want = supported.OrderBy(d => order.IndexOf(ReadFlavorProduct(d) ?? ProductForFolderName(d))).First();
-                }
-                return AddOnsInFlavor(want);
-            }
+            string inBase = ResolveBase(picked, preferredProduct);
+            if (inBase != null) return inBase;
 
             // Last resort: Interface\AddOns directly under whatever was picked.
             string guess = Path.Combine(picked, "Interface", "AddOns");
             if (Directory.Exists(guess)) return guess;
 
+            // Picked the folder that HOLDS the base folder, e.g. D:\Games\Blizzard
+            // with World of Warcraft inside it. Someone who does not know which
+            // folder is meant picks the outer one (reported 2026-11-23). One
+            // level down only, the folder called World of Warcraft first.
+            string[] subDirs;
+            try { subDirs = Directory.GetDirectories(picked); }
+            catch { subDirs = new string[0]; }
+            foreach (string sub in subDirs.OrderBy(d =>
+                         Path.GetFileName(d).Equals("World of Warcraft", StringComparison.OrdinalIgnoreCase) ? 0 : 1))
+            {
+                string found = ResolveBase(sub, preferredProduct);
+                if (found != null)
+                {
+                    Logger.Info($"Picked folder {picked} holds the WoW folder {sub}.");
+                    return found;
+                }
+            }
+
             return null;
+        }
+
+        /// <summary>
+        /// The AddOns folder of a client in a WoW base folder: the wanted client
+        /// first, then the first supported one in <see cref="Clients"/> order.
+        /// Null when the folder holds no supported client.
+        /// </summary>
+        private static string ResolveBase(string baseDir, string preferredProduct)
+        {
+            string[] flavorDirs;
+            try { flavorDirs = Directory.GetDirectories(baseDir, "_*_"); }
+            catch { return null; }
+            var supported = flavorDirs.Where(IsSupportedFlavor).ToList();
+            if (supported.Count == 0) return null;
+
+            string want = supported.FirstOrDefault(d =>
+                string.Equals(ReadFlavorProduct(d) ?? ProductForFolderName(d), preferredProduct,
+                              StringComparison.OrdinalIgnoreCase));
+            if (want == null)
+            {
+                var order = SupportedProducts.ToList();
+                want = supported.OrderBy(d => order.IndexOf(ReadFlavorProduct(d) ?? ProductForFolderName(d))).First();
+            }
+            return AddOnsInFlavor(want);
         }
 
         // --- Game process detection ---

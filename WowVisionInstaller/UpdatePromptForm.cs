@@ -147,20 +147,14 @@ namespace WowVisionInstaller
 
         private void RefreshTexts()
         {
-            bool anyAddon = WithAddon.Count > 0;
             bool anyClient = OneClickTargets.Count > 0;
-            bool anyUpdate = _targets.Exists(t => t.UpdateAvailable);
 
-            if (!anyClient)
-                _titleLabel.Text = Loc.Get("update.heading.noClient");
-            else if (!anyAddon)
-                _titleLabel.Text = Loc.Get("update.heading.notInstalled");
-            else if (anyUpdate)
-                _titleLabel.Text = Loc.Get("update.heading.available");
-            else
-                _titleLabel.Text = Loc.Get("update.heading.current");
+            // Heading, primary button and the lines about unfinished setup
+            // are decided in InstallTarget.Opening, where the self-test reads them.
+            var opening = InstallTarget.Opening(_targets, WithAddon, OneClickTargets);
 
-            _infoLabel.Text = ComposeBody(anyClient, anyAddon);
+            _titleLabel.Text = Loc.Get(opening.HeadingKey);
+            _infoLabel.Text = ComposeBody(anyClient, opening);
 
             // The primary action is Browse only when there is nothing to act on.
             _browseButton.Visible = !anyClient;
@@ -173,14 +167,13 @@ namespace WowVisionInstaller
             _collectLogsButton.Visible = Found.Count > 0;
 
             _browseButton.Text = Loc.Get("update.browseBtn");
-            _primaryButton.Text = anyAddon ? Loc.Get("update.updateBtn") : Loc.Get("update.installBtn");
+            _primaryButton.Text = Loc.Get(opening.PrimaryStem + "Btn");
             _customizeButton.Text = Loc.Get("update.customizeBtn");
             _collectLogsButton.Text = Loc.Get("logs.btn");
             _closeButton.Text = Loc.Get("nav.close");
 
             _browseButton.AccessibleName = Loc.Get("update.browseAcc");
-            _primaryButton.AccessibleName = anyAddon
-                ? Loc.Get("update.updateAcc") : Loc.Get("update.installAcc");
+            _primaryButton.AccessibleName = Loc.Get(opening.PrimaryStem + "Acc");
             _customizeButton.AccessibleName = Loc.Get("update.customizeAcc");
             _collectLogsButton.AccessibleName = Loc.Get("logs.btnAcc");
             _closeButton.AccessibleName = Loc.Get("update.closeAcc");
@@ -200,7 +193,7 @@ namespace WowVisionInstaller
         /// button label has room for two words, and "what will this actually do to
         /// my install" is the question the reports said people could not answer.
         /// </summary>
-        private string ComposeBody(bool anyClient, bool anyAddon)
+        private string ComposeBody(bool anyClient, InstallTarget.OpeningText opening)
         {
             var sb = new StringBuilder();
 
@@ -227,6 +220,10 @@ namespace WowVisionInstaller
             foreach (var t in Found)
                 sb.AppendLine($"{t.DisplayName}: {t.StatusLine()}");
 
+            // Unfinished setup, per client, with what to do about it.
+            foreach (string line in opening.SetupLines)
+                sb.AppendLine(line);
+
             // Extra addons: say by name and PER CLIENT what "Update now" would
             // additionally update or newly install, so the one-click button never
             // does silent extra work.
@@ -250,9 +247,7 @@ namespace WowVisionInstaller
             sb.AppendLine();
 
             string names = string.Join(", ", OneClickTargets.ConvertAll(t => t.DisplayName));
-            sb.AppendLine(anyAddon
-                ? Loc.Format("update.explainUpdate", names)
-                : Loc.Format("update.explainInstall", names));
+            sb.AppendLine(Loc.Format(opening.ExplainKey, names));
             sb.AppendLine(Loc.Get("update.explainCustomize"));
             sb.AppendLine(Loc.Get("logs.explain"));
 

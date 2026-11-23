@@ -310,6 +310,12 @@ namespace WowVisionInstaller
                       WowLocator.ResolveUserPickedFolder(wow.AddOns[Config.EraFlavor]) == wow.AddOns[Config.EraFlavor]);
                 Check("the PTR folder is not accepted as a client",
                       WowLocator.ResolveUserPickedFolder(wow.FlavorDir["wow_classic_ptr"]) == null);
+                Check("the folder that holds the WoW folder + Mists wanted -> Mists AddOns",
+                      WowLocator.ResolveUserPickedFolder(Path.Combine(wow.Root, "Games"), Config.MistsFlavor) == wow.AddOns[Config.MistsFlavor]);
+                Check("the folder that holds the WoW folder, nothing wanted -> first client in order (Forever)",
+                      WowLocator.ResolveUserPickedFolder(Path.Combine(wow.Root, "Games")) == wow.AddOns[Config.ForeverFlavor]);
+                Check("two levels above the WoW folder is not accepted",
+                      WowLocator.ResolveUserPickedFolder(wow.Root) == null);
                 foreach (var kv in expected)
                     Check($"{WowLocator.ShortLabel(kv.Key)} AddOns folder names its client",
                           WowLocator.ProductForAddOnsFolder(wow.AddOns[kv.Key]) == kv.Key);
@@ -319,12 +325,14 @@ namespace WowVisionInstaller
                 Check("both blockers reported on a fresh WTF", GameSettings.CheckNeeded(fwd).Count == GameSettings.Required.Length);
                 Check("a trailing backslash on the AddOns path finds the same WTF",
                       GameSettings.CheckNeeded(fwd + "\\").Count == GameSettings.Required.Length);
+                Check("settings missing, account folder there -> setup can be finished", GameSettings.State(fwd) == SetupState.CanFinish);
                 GameSettings.Apply(fwd, m => Console.WriteLine("    " + m));
                 Check("written into that client's own WTF",
                       File.ReadAllText(Path.Combine(wow.FlavorDir[Config.ForeverFlavor], "WTF", "Config.wtf")).Contains("SET checkAddonVersion \"0\"") &&
                       File.ReadAllText(Path.Combine(wow.FlavorDir[Config.ForeverFlavor], "WTF", "Account", "TESTACCOUNT", "config-cache.wtf"))
                           .Contains("SET AllowDangerousScripts \"1\""));
                 Check("nothing left to fix afterwards", GameSettings.CheckNeeded(fwd).Count == 0);
+                Check("and setup counts as complete", GameSettings.State(fwd) == SetupState.Complete);
                 Check("other clients untouched", !File.Exists(Path.Combine(wow.FlavorDir[Config.MistsFlavor], "WTF", "Config.wtf")));
 
                 // A file that cannot be written is said out loud, not only logged.
@@ -337,6 +345,36 @@ namespace WowVisionInstaller
                 foreach (var m in said) Console.WriteLine("    " + m);
                 Check("a failed write is reported with its file", said.Any(m => m.Contains(lockedCache)));
                 Check("and the setting is still reported as needed", GameSettings.CheckNeeded(fwd).Count == 1);
+                Check("a failed write leaves setup unfinished", GameSettings.State(fwd) == SetupState.CanFinish);
+                Check("the summary then says the setting could not be written, not that it was adjusted",
+                      InstallRunner.SettingsSummary(fwd, true).Contains(Loc.Get("summary.settingsFailed")) &&
+                      !InstallRunner.SettingsSummary(fwd, true).Contains(Loc.Get("summary.settings")));
+                GameSettings.Apply(fwd, null);
+                Check("once the file can be written, the next run completes setup", GameSettings.State(fwd) == SetupState.Complete);
+                Check("and the summary says adjusted",
+                      InstallRunner.SettingsSummary(fwd, true).Count == 1 &&
+                      InstallRunner.SettingsSummary(fwd, true)[0] == Loc.Get("summary.settings"));
+                Check("a run with no settings due says nothing about them", InstallRunner.SettingsSummary(fwd, false).Count == 0);
+
+                Console.WriteLine("=== game settings before the first login ===");
+                // The game creates WTF\Account\<name> at the first login. Before
+                // that the account setting has nowhere to go.
+                string rtl = wow.AddOns[Config.RetailFlavor];
+                string rtlWtf = Path.Combine(wow.FlavorDir[Config.RetailFlavor], "WTF");
+                Directory.Delete(Path.Combine(rtlWtf, "Account"), true);
+                Check("no account folder, global setting missing -> this run has work", GameSettings.State(rtl) == SetupState.CanFinish);
+                GameSettings.Apply(rtl, m => Console.WriteLine("    " + m));
+                Check("the global setting is written, the account setting waits for the first login",
+                      File.ReadAllText(Path.Combine(rtlWtf, "Config.wtf")).Contains("SET checkAddonVersion \"0\"") &&
+                      GameSettings.State(rtl) == SetupState.NeedsFirstLogin);
+                Directory.Delete(rtlWtf, true);
+                Check("no WTF folder at all -> first login needed, nothing to write",
+                      GameSettings.State(rtl) == SetupState.NeedsFirstLogin && GameSettings.CheckNeeded(rtl).Count == 0);
+                Directory.CreateDirectory(Path.Combine(rtlWtf, "Account", "TESTACCOUNT"));
+                Check("after the first login the settings can be written", GameSettings.State(rtl) == SetupState.CanFinish);
+                GameSettings.Apply(rtl, null);
+                Check("and a second run completes setup", GameSettings.State(rtl) == SetupState.Complete);
+                Directory.Delete(Path.Combine(rtlWtf, "Account"), true);   // left as "never logged in" for the status lines
 
                 Console.WriteLine("=== status lines ===");
                 Config.SetChannel(Channel.Stable);
@@ -352,6 +390,59 @@ namespace WowVisionInstaller
                 Check("Mists copied git checkout -> test build, no update offered",
                       T(Config.MistsFlavor).HasTestBuild && !T(Config.MistsFlavor).UpdateAvailable);
                 Check("Retail without WowVision -> fresh install", T(Config.RetailFlavor).ClientFound && !T(Config.RetailFlavor).HasAddon);
+                Check("Forever, settings written -> setup complete", T(Config.ForeverFlavor).Setup == SetupState.Complete);
+                Check("Anniversary, settings missing -> setup can be finished", T(Config.AnniversaryFlavor).Setup == SetupState.CanFinish);
+                Check("Retail never logged in, but without WowVision -> no setup question yet",
+                      GameSettings.State(rtl) == SetupState.NeedsFirstLogin && T(Config.RetailFlavor).Setup == SetupState.Complete);
+
+                Console.WriteLine("=== the opening screen and unfinished setup ===");
+                {
+                    // As the form asks: every client, the ones with WowVision, and
+                    // what the primary button acts on.
+                    InstallTarget.OpeningText Screen(List<InstallTarget> shown)
+                    {
+                        var with = shown.FindAll(t => t.CarriesWowVision);
+                        return InstallTarget.Opening(shown, with, with.Count > 0 ? with : shown.FindAll(t => t.ClientFound));
+                    }
+
+                    var eraT = T(Config.EraFlavor);
+                    var eraOnly = new List<InstallTarget> { eraT };
+                    var o = Screen(eraOnly);
+                    Check("up to date but a setting missing: the heading says setup is not finished",
+                          o.HeadingKey == "update.heading.setup");
+                    Check("the game version is named with what happens",
+                          o.SetupLines.Count == 1 && o.SetupLines[0] == Loc.Format("update.setupCanFinish", eraT.DisplayName));
+                    Check("the primary button reads Finish setup and is explained as that",
+                          o.PrimaryStem == "update.finish" && o.ExplainKey == "update.explainFinish");
+
+                    o = Screen(targets);
+                    Check("with an update available the heading stays the update", o.HeadingKey == "update.heading.available");
+                    Check("the button stays Update now, the setup lines are still there",
+                          o.PrimaryStem == "update.update" &&
+                          o.SetupLines.Contains(Loc.Format("update.setupCanFinish", T(Config.AnniversaryFlavor).DisplayName)));
+                    Check("a client without WowVision gets no setup line",
+                          !o.SetupLines.Exists(l => l.StartsWith(T(Config.RetailFlavor).DisplayName)));
+
+                    GameSettings.Apply(era, null);
+                    o = Screen(eraOnly);
+                    Check("settings written: plain up to date again",
+                          o.HeadingKey == "update.heading.current" && o.PrimaryStem == "update.update" && o.SetupLines.Count == 0);
+
+                    Directory.Delete(Path.Combine(wow.FlavorDir[Config.EraFlavor], "WTF", "Account"), true);
+                    o = Screen(eraOnly);
+                    Check("never logged in: setup not finished, with the instruction to log in once",
+                          o.HeadingKey == "update.heading.setup" &&
+                          o.SetupLines.Count == 1 && o.SetupLines[0] == Loc.Format("update.setupFirstLogin", eraT.DisplayName));
+                    Check("there is nothing to finish yet, so the button stays Update now", o.PrimaryStem == "update.update");
+                    Check("the end summary carries the instruction to log in once",
+                          InstallRunner.SettingsSummary(era, false).Contains(Loc.Get("summary.firstLogin")));
+
+                    Check("no client at all: the heading says so",
+                          Screen(new List<InstallTarget>()).HeadingKey == "update.heading.noClient");
+                    Check("a client without WowVision: not installed yet, Install now",
+                          Screen(new List<InstallTarget> { T(Config.RetailFlavor) }).HeadingKey == "update.heading.notInstalled" &&
+                          Screen(new List<InstallTarget> { T(Config.RetailFlavor) }).PrimaryStem == "update.install");
+                }
 
                 Console.WriteLine("=== WoW Forever out of its beta folder ===");
                 {
@@ -771,6 +862,45 @@ namespace WowVisionInstaller
             Check("file server URL splits the id",
                   CurseForge.DownloadUrl(9208630, "GTFO-6.12.2.zip") == "https://edge.forgecdn.net/files/9208/630/GTFO-6.12.2.zip");
 
+            Console.WriteLine("=== cursetest: the summary line of an extra addon ===");
+            {
+                var questie = ManagedAddons.Entries.Find(e => e.PrefKey == "ManageQuestie");
+                var emptyManifest = new InstallManifest();
+                ManagedAddons.SeedPins();
+                string done = InstallRunner.ManagedSummary(new ManagedPlanItem { Entry = questie }, emptyManifest, Config.EraFlavor, "Classic Era");
+                string failedLine = InstallRunner.ManagedSummary(new ManagedPlanItem { Entry = questie, Failed = true }, emptyManifest, Config.EraFlavor, "Classic Era");
+                Check("an installed addon is said as installed", done == Loc.Format("summary.updated", "Questie",
+                      ManagedAddons.DisplayVersion(questie.Packages[0].PinVersion)));
+                Check("a refused or incomplete one is not said as installed",
+                      failedLine == Loc.Format("summary.managedFailed", "Questie"));
+                Check("Questie leaves QuestieTrace out", questie.Packages[0].SkipRoots.Contains("QuestieTrace"));
+            }
+
+            Console.WriteLine("=== cursetest: did the source answer ===");
+            var look = CurseForge.Read(json, gtfo);
+            Check("a listing with the file: answered, file found", look.Answered && look.File != null && look.File.Id == 600);
+            look = CurseForge.Read(json, @"^Other-(\d+)\.zip$");
+            Check("a listing without a file under the known name: answered, no file", look.Answered && look.File == null);
+            Check("an error page: not answered", !CurseForge.Read("<html>blocked</html>", gtfo).Answered);
+            Check("nothing at all: not answered", !CurseForge.Read(null, gtfo).Answered);
+
+            Console.WriteLine("=== cursetest: AtlasLoot under its names ===");
+            var atlas = ManagedAddons.Entries.Find(e => e.PrefKey == "ManageAtlasLoot").Packages[0];
+            // The listing of 2026-11-23, cut down: three files per release, and
+            // one under a name nobody has looked at.
+            string atlasJson = "{\"data\":[" +
+                "{\"id\":9999999,\"fileName\":\"AtlasLootContinued-Mystery_13000.zip\",\"fileLength\":10,\"releaseType\":1}," +
+                "{\"id\":9767138,\"fileName\":\"AtlasLootContinued-Anniversary_12992.zip\",\"fileLength\":2682546,\"releaseType\":1}," +
+                "{\"id\":9767288,\"fileName\":\"AtlasLootContinued-Forever_12993.zip\",\"fileLength\":2682555,\"releaseType\":1}," +
+                "{\"id\":9766697,\"fileName\":\"AtlasLootContinued-ERA_12991.zip\",\"fileLength\":2682530,\"releaseType\":1}," +
+                "{\"id\":9660151,\"fileName\":\"AtlasLootClassic-Continued_12968.zip\",\"fileLength\":1693565,\"releaseType\":1}" +
+                "],\"pagination\":{}}";
+            var af = CurseForge.PickLatest(atlasJson, atlas.CurseFilePattern);
+            Check("the newest of the three per-client files is picked", af != null && af.Id == 9767288 && af.Version == "12993");
+            Check("the older name is still read",
+                  Regex.Match("AtlasLootClassic-Continued_12968.zip", atlas.CurseFilePattern).Groups[1].Value == "12968");
+            Check("a name nobody has looked at is passed over", af != null && af.FileName != "AtlasLootContinued-Mystery_13000.zip");
+
             Console.WriteLine("=== cursetest: every CurseForge package names its pin the way its pattern does ===");
             foreach (var entry in ManagedAddons.Entries)
                 foreach (var p in entry.Packages)
@@ -813,6 +943,23 @@ namespace WowVisionInstaller
                 foreach (var p in e.Packages)
                     ManagedAddons.SetResolved(new ResolvedManagedPackage { Package = p, Version = p.PinVersion, Url = p.PinUrl });
             Check("every lookup worked: no notice", ManagedAddons.LookupFailureNotice(all, forever) == null);
+
+            // A source that answers, but has no file under a name we know, is
+            // not a failed lookup: nothing is said, the pin stays in use.
+            var onlyAtlas = ManagedAddons.Entries.ToDictionary(e => e.PrefKey, e => e.PrefKey == "ManageAtlasLoot");
+            ManagedAddons.SeedPins();
+            ManagedAddons.ApplyCurseLookup(atlas, new CurseForge.CurseLookup { Answered = false });
+            notice = ManagedAddons.LookupFailureNotice(onlyAtlas, forever);
+            Check("no answer from CurseForge: AtlasLoot is named", notice != null && notice.Contains("AtlasLoot Continued"));
+            ManagedAddons.ApplyCurseLookup(atlas, new CurseForge.CurseLookup { Answered = true });
+            Check("answered without a known file: no notice", ManagedAddons.LookupFailureNotice(onlyAtlas, forever) == null);
+            Check("and the built-in version stays in use, with its checksum",
+                  ManagedAddons.Resolved(atlas).Version == atlas.PinVersion && ManagedAddons.Resolved(atlas).Sha256 == atlas.PinSha256);
+            ManagedAddons.SeedPins();
+            ManagedAddons.ApplyCurseLookup(atlas, CurseForge.Read(atlasJson, atlas.CurseFilePattern));
+            Check("answered with the pinned file: no notice, the pin's checksum kept",
+                  ManagedAddons.LookupFailureNotice(onlyAtlas, forever) == null &&
+                  ManagedAddons.Resolved(atlas).Sha256 == atlas.PinSha256);
             Loc.Set(lang);
         }
 
@@ -926,6 +1073,10 @@ namespace WowVisionInstaller
                     bool ok = ManagedAddonInstaller.InstallEntryAsync(addons, product, entry, github, manifest,
                             pr => { if (pr.Phase != "download") Console.WriteLine("      " + pr.Message); }, force: false)
                         .GetAwaiter().GetResult();
+                    // A failure's reason is only in the log: show its warnings and errors.
+                    if (!ok)
+                        foreach (string line in Logger.Snapshot().Where(l => l.Contains("WARN:") || l.Contains("ERROR:")).Reverse().Take(6).Reverse())
+                            Console.WriteLine("      log: " + line);
                     bool unavailable = ManagedAddons.PackagesFor(entry, product).Any(p => ManagedAddons.KnownUnavailable(manifest, p));
                     Check(entry.DisplayName + (unavailable ? " found unusable and skipped" : " installed"),
                           ok && (unavailable || ManagedAddons.EntryInstalled(addons, product, entry)));
@@ -933,6 +1084,9 @@ namespace WowVisionInstaller
                         if (!ManagedAddons.KnownUnavailable(manifest, p))
                             Check($"{p.Key} carries a TOC this client loads",
                                   p.RequiredRoots.Any(rt => WowLocator.FolderServesClient(addons, rt, product)));
+                    foreach (var p in ManagedAddons.PackagesFor(entry, product))
+                        foreach (string skip in p.SkipRoots)
+                            Check($"{p.Key}: {skip} is left out", !Directory.Exists(Path.Combine(addons, skip)));
                 }
                 manifest.Save(addons);
 

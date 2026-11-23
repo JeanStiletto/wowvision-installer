@@ -85,6 +85,14 @@ namespace WowVisionInstaller
         public string PinVersion;
         public string PinUrl;
         public string PinSha256;
+
+        /// <summary>
+        /// Top-level folders of the zip that are known and deliberately NOT
+        /// installed. They are no reason to refuse the package and they are
+        /// never copied. A copy the player put into AddOns themselves is left
+        /// alone.
+        /// </summary>
+        public string[] SkipRoots = new string[0];
     }
 
     /// <summary>One checkbox on the components page: a named bundle of packages.</summary>
@@ -153,12 +161,25 @@ namespace WowVisionInstaller
                         // and the quest data moved to a second required folder,
                         // QuestieDB. Until installer 5.5 the plain-tag pattern
                         // rejected those tags and kept every client on 11.37.1.
+                        //
+                        // The bundle of 2026-11 (seen in v12.13.0+v1.1.5) carries a
+                        // third addon, QuestieTrace: "Data collection addon for
+                        // Questie". It records gameplay data on the player's
+                        // machine after asking once, in a dialog of its own that
+                        // is not one of the game's popups. Questie lists it as an
+                        // optional dependency and runs without it. It is left out:
+                        // nobody chose it by ticking Questie, and its question
+                        // would meet a blind player as a dialog nothing reads.
+                        // Before this the unknown folder made the installer refuse
+                        // the whole bundle, so Questie was not installed or
+                        // updated at all.
                         Key = "CurseQuestie", RequiredRoots = new[] { "Questie", "QuestieDB" },
+                        SkipRoots = new[] { "QuestieTrace" },
                         Products = AllButRetail,   // Questie has no retail build
                         GitHubRepo = "Questie/Questie", TagPrefix = "bundle/", AssetTemplate = "Questie-{name}.zip",
-                        PinVersion = "bundle/v12.10.0+v1.1.2",
-                        PinUrl = "https://github.com/Questie/Questie/releases/download/bundle%2Fv12.10.0%2Bv1.1.2/Questie-v12.10.0%2Bv1.1.2.zip",
-                        PinSha256 = "32353324005f7a37b479b369818fded862eda1231f7a13c22180e6b4318f864a",
+                        PinVersion = "bundle/v12.13.0+v1.1.5",
+                        PinUrl = "https://github.com/Questie/Questie/releases/download/bundle%2Fv12.13.0%2Bv1.1.5/Questie-v12.13.0%2Bv1.1.5.zip",
+                        PinSha256 = "bd47e4ade92cb352d3cbcf1267cc85343c01a2bc6bcc495f0fa992633a32d995",
                     },
                 },
             },
@@ -203,10 +224,19 @@ namespace WowVisionInstaller
                             "AtlasLoot_PvP",
                         },
                         CurseProjectId = 1270310,
-                        CurseFilePattern = @"^AtlasLootClassic-Continued_(\d+)\.zip$",
-                        PinVersion = "12968",
-                        PinUrl = "https://edge.forgecdn.net/files/9660/151/AtlasLootClassic-Continued_12968.zip",
-                        PinSha256 = "a97dda0290f71470f4bb6a1af3b766cadaf49174b6b06564168ec80d5112613a",
+                        // Since 2026-11-17 each release is published three times,
+                        // as AtlasLootContinued-ERA_N, -Anniversary_N and
+                        // -Forever_N with a number of its own. Compared on
+                        // 2026-11-23 (12991, 12992, 12993): the same 495 files,
+                        // differing only in the Version line of the TOCs, the
+                        // same folders as before plus AtlasLootContinued_Upgrades.
+                        // So one package still serves all three clients, and the
+                        // newest of the three files is taken. The older name stays
+                        // accepted.
+                        CurseFilePattern = @"^AtlasLoot(?:Classic-Continued|Continued-(?:ERA|Anniversary|Forever))_(\d+)\.zip$",
+                        PinVersion = "12993",
+                        PinUrl = "https://edge.forgecdn.net/files/9767/288/AtlasLootContinued-Forever_12993.zip",
+                        PinSha256 = "4e84f3229b473e7d99a2d68dda18e6c0f0504ad10ba7b0735436ef58199e0650",
                     },
                 },
             },
@@ -423,19 +453,11 @@ namespace WowVisionInstaller
                     {
                         tasks.Add(Task.Run(async () =>
                         {
-                            var f = await CurseForge.ResolveLatestAsync(github, p.CurseProjectId,
-                                                                        p.CurseFilePattern, timeout);
-                            if (f == null) return;
-                            // The newest file IS the pin: keep the pin's checksum.
-                            bool isPin = string.Equals(f.Version, p.PinVersion, StringComparison.OrdinalIgnoreCase);
-                            var r = new ResolvedManagedPackage
-                            {
-                                Package = p, Version = f.Version, ExpectedLength = f.Length,
-                                Url = isPin ? p.PinUrl : CurseForge.DownloadUrl(f.Id, f.FileName),
-                                Sha256 = isPin ? p.PinSha256 : null,
-                            };
-                            SetResolved(r);
-                            Logger.Info($"{p.Key}: newest CurseForge file {f.FileName} (project {p.CurseProjectId}).");
+                            var look = await CurseForge.LookUpLatestAsync(github, p.CurseProjectId,
+                                                                          p.CurseFilePattern, timeout);
+                            ApplyCurseLookup(p, look);
+                            if (look.File != null)
+                                Logger.Info($"{p.Key}: newest CurseForge file {look.File.FileName} (project {p.CurseProjectId}).");
                         }));
                         continue;
                     }
@@ -483,6 +505,35 @@ namespace WowVisionInstaller
                             Package = pkg, Version = pkg.PinVersion, Url = pkg.PinUrl, Sha256 = pkg.PinSha256,
                             LookupFailedSource = LiveSource(pkg),
                         };
+        }
+
+        /// <summary>
+        /// Records what CurseForge said about one package. No answer leaves the
+        /// package marked as a failed lookup (the player is told). An answer
+        /// without a file under a name we know keeps the pin WITHOUT that mark:
+        /// the source did answer, and telling every player on every run about a
+        /// renamed zip helps nobody. The log has it.
+        /// </summary>
+        internal static void ApplyCurseLookup(ManagedPackage p, CurseForge.CurseLookup look)
+        {
+            if (look == null || !look.Answered) return;
+            var f = look.File;
+            if (f == null)
+            {
+                SetResolved(new ResolvedManagedPackage
+                {
+                    Package = p, Version = p.PinVersion, Url = p.PinUrl, Sha256 = p.PinSha256,
+                });
+                return;
+            }
+            // The newest file IS the pin: keep the pin's checksum.
+            bool isPin = string.Equals(f.Version, p.PinVersion, StringComparison.OrdinalIgnoreCase);
+            SetResolved(new ResolvedManagedPackage
+            {
+                Package = p, Version = f.Version, ExpectedLength = f.Length,
+                Url = isPin ? p.PinUrl : CurseForge.DownloadUrl(f.Id, f.FileName),
+                Sha256 = isPin ? p.PinSha256 : null,
+            });
         }
 
         /// <summary>Records where one package resolved to this run.</summary>
@@ -817,6 +868,13 @@ namespace WowVisionInstaller
                 // folder must be expected (or match the prefix) and carry a TOC;
                 // every required folder must actually be in the zip.
                 var roots = Directory.GetDirectories(staging).Select(Path.GetFileName).ToList();
+                // Folders the package is known to carry and that are left out on
+                // purpose: not checked, not copied.
+                foreach (var skipped in roots.Where(r => pkg.SkipRoots.Contains(r, StringComparer.OrdinalIgnoreCase)).ToList())
+                {
+                    roots.Remove(skipped);
+                    Logger.Info($"{pkg.Key}: folder '{skipped}' is left out on purpose; not installed.");
+                }
                 if (Directory.GetFiles(staging).Length > 0)
                 {
                     Logger.Warning($"{pkg.Key}: loose files at the zip root — refusing.");

@@ -40,6 +40,13 @@ namespace WowVisionInstaller
     {
         public ManagedEntry Entry;
         public bool FirstInstall;  // some required folder doesn't exist yet
+
+        /// <summary>
+        /// Set by the run when the entry was not installed, or not completely
+        /// (a refused package, a failed check, locked files). The summary then
+        /// says so; it used to say "Installed" either way.
+        /// </summary>
+        public bool Failed;
     }
 
     /// <summary>

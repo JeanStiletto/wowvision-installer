@@ -80,9 +80,16 @@ of a pin (see "Where things come from"), and the check per game version. Each
 package names the clients it exists for, taken from the real zips on
 2026-10-19:
 
-- Questie: every client except Retail.
+- Questie: every client except Retail. Its bundle also carries QuestieTrace, a
+  data collection addon that asks for consent in a dialog of its own. It is
+  left out on purpose (`SkipRoots` of the package): Questie runs without it,
+  nobody chose it by ticking Questie, and nothing reads its dialog to a blind
+  player. A copy the player installed themselves is not touched.
 - AtlasLoot Continued: WoW Forever, Anniversary, Classic Era (no Mists or
-  Retail TOC).
+  Retail TOC). Since 2026-11-17 each release comes as three files
+  (`AtlasLootContinued-ERA_N`, `-Anniversary_N`, `-Forever_N`) that differ
+  only in the version line of their TOCs; the newest of the three is
+  installed into all three clients.
 - Details, GTFO, BugSack with BugGrabber: all five.
 - Deadly Boss Mods: core and dungeons for all five; raid mods per era (BC for
   Anniversary, Vanilla for Era and Forever, the new DBM-MoP package for Mists;
@@ -185,7 +192,21 @@ exit):
 
 - `checkAddonVersion 0` in `WTF\Config.wtf`: "Load out of date AddOns".
 - `AllowDangerousScripts 1` in each account's `config-cache.wtf`: no
-  "run this script?" popup.
+  "run this script?" popup. WowVision's keys run scripts, and an addon
+  cannot turn this on by itself.
+
+The account's folder (`WTF\Account\<name>`) only exists after the first
+login to that game version, so an install before that login cannot write the
+second setting. Since 1.7 the installer says so (`GameSettings.State`):
+
+- The summary of that run says to log in once, close the game and run the
+  WowVision Updater again.
+- The opening screen checks the settings of every game version that has
+  WowVision. With a setting missing its heading is "WowVision setup is not
+  finished" and it names the game version. If the setting can be written, the
+  main button reads "Finish setup" when there is nothing else to update; it
+  is the same run as "Update now". If the first login is still missing, the
+  text gives the same instruction as the summary.
 
 ## Left out on purpose
 

@@ -36,6 +36,22 @@ namespace WowVisionInstaller
             public string Version;
         }
 
+        /// <summary>What one look at a project's listing gave.</summary>
+        public class CurseLookup
+        {
+            /// <summary>The newest release file under a name we know, or null.</summary>
+            public CurseFile File;
+
+            /// <summary>
+            /// True when a listing came back. False: the source did not answer
+            /// (offline, blocked, an error page). Answered with no File means
+            /// the project has no release under a name we know. It renamed its
+            /// zip, which is for us to look at (the log says so), not something
+            /// a player can act on: AtlasLoot did this on 2026-11-17.
+            /// </summary>
+            public bool Answered;
+        }
+
         public static string ListingUrl(int projectId) =>
             $"https://www.curseforge.com/api/v1/mods/{projectId}/files" +
             "?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true";
@@ -53,17 +69,9 @@ namespace WowVisionInstaller
         /// </summary>
         public static CurseFile PickLatest(string json, string fileNamePattern)
         {
-            if (string.IsNullOrEmpty(json) || string.IsNullOrEmpty(fileNamePattern)) return null;
-            object parsed;
-            try { parsed = new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024 }.DeserializeObject(json); }
-            catch (Exception ex)
-            {
-                Logger.Warning($"CurseForge listing is not JSON: {ex.Message}");
-                return null;
-            }
-            if (!(parsed is IDictionary<string, object> root) ||
-                !root.TryGetValue("data", out var dataObj) || !(dataObj is IEnumerable data))
-                return null;
+            if (string.IsNullOrEmpty(fileNamePattern)) return null;
+            var data = ListingData(json);
+            if (data == null) return null;
 
             var pattern = new Regex(fileNamePattern, RegexOptions.CultureInvariant);
             CurseFile best = null;
@@ -84,16 +92,43 @@ namespace WowVisionInstaller
             return best;
         }
 
-        /// <summary>The newest release file of a project online, or null (logged).</summary>
-        public static async Task<CurseFile> ResolveLatestAsync(GitHubClient http, int projectId,
-                                                               string fileNamePattern, TimeSpan timeout)
+        /// <summary>The files of a listing, or null when the text is not a listing (nothing, an error page).</summary>
+        private static IEnumerable ListingData(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return null;
+            object parsed;
+            try { parsed = new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024 }.DeserializeObject(json); }
+            catch (Exception ex)
+            {
+                Logger.Warning($"CurseForge listing is not JSON: {ex.Message}");
+                return null;
+            }
+            if (!(parsed is IDictionary<string, object> root) ||
+                !root.TryGetValue("data", out var dataObj) || !(dataObj is IEnumerable data))
+                return null;
+            return data;
+        }
+
+        /// <summary>What a listing's text says: whether it is a listing, and its newest release file.</summary>
+        public static CurseLookup Read(string json, string fileNamePattern) =>
+            new CurseLookup { Answered = ListingData(json) != null, File = PickLatest(json, fileNamePattern) };
+
+        /// <summary>One look at a project's listing online (a missing file is logged).</summary>
+        public static async Task<CurseLookup> LookUpLatestAsync(GitHubClient http, int projectId,
+                                                                string fileNamePattern, TimeSpan timeout)
         {
             string json = await http.DownloadTextAsync(ListingUrl(projectId), timeout);
-            var file = PickLatest(json, fileNamePattern);
-            if (file == null && json != null)
-                Logger.Warning($"CurseForge project {projectId}: no release file named like {fileNamePattern}.");
-            return file;
+            var look = Read(json, fileNamePattern);
+            if (look.File == null && look.Answered)
+                Logger.Warning($"CurseForge project {projectId}: no release file named like {fileNamePattern}. " +
+                               "The project may have renamed its zip; the built-in version stays in use.");
+            return look;
         }
+
+        /// <summary>The newest release file of a project online, or null (logged).</summary>
+        public static async Task<CurseFile> ResolveLatestAsync(GitHubClient http, int projectId,
+                                                               string fileNamePattern, TimeSpan timeout) =>
+            (await LookUpLatestAsync(http, projectId, fileNamePattern, timeout)).File;
 
         private static long AsLong(IDictionary<string, object> f, string key)
         {

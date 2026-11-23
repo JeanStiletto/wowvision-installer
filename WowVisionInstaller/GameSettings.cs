@@ -7,6 +7,21 @@ namespace WowVisionInstaller
 {
     public enum CVarScope { Global, Account }
 
+    /// <summary>Whether a client's game settings are in place, and if not, what is in the way.</summary>
+    public enum SetupState
+    {
+        /// <summary>Every required setting is set.</summary>
+        Complete,
+        /// <summary>A setting is missing and can be written now (with the game closed).</summary>
+        CanFinish,
+        /// <summary>
+        /// The account setting cannot be written yet. The game creates the
+        /// account's folder at the first login, and there is none. Nothing
+        /// but a second run after that login gets the setting written.
+        /// </summary>
+        NeedsFirstLogin,
+    }
+
     /// <summary>One game-client CVar we keep set so WowVision works for a blind user.</summary>
     public class CVarSpec
     {
@@ -135,6 +150,22 @@ namespace WowVisionInstaller
                 }
             }
             return issues;
+        }
+
+        /// <summary>
+        /// Where this client stands (read-only, safe while the game runs). A
+        /// setting that can be written now comes first: a client with no
+        /// account folder and no checkAddonVersion still has work for this run,
+        /// and reports the first login once that is done. A reported case
+        /// (Discord, 2026-11-23): installed before the first login, the game
+        /// refused the scripts behind WowVision's keys, and nothing said that
+        /// a second run was needed.
+        /// </summary>
+        public static SetupState State(string addonsFolder)
+        {
+            if (CheckNeeded(addonsFolder).Count > 0) return SetupState.CanFinish;
+            if (AccountConfigCaches(addonsFolder).Count == 0) return SetupState.NeedsFirstLogin;
+            return SetupState.Complete;
         }
 
         // --- apply (GAME MUST BE CLOSED) ---

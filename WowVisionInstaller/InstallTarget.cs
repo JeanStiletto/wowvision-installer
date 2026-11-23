@@ -14,6 +14,67 @@ namespace WowVisionInstaller
     /// </summary>
     public class InstallTarget
     {
+        /// <summary>
+        /// What the opening screen says, decided here and not in the form: this
+        /// file has no WinForms in it, so the self-test can read the answers.
+        /// </summary>
+        public class OpeningText
+        {
+            /// <summary>Text key of the heading.</summary>
+            public string HeadingKey;
+            /// <summary>"update.finish", "update.update" or "update.install": add "Btn" or "Acc".</summary>
+            public string PrimaryStem;
+            /// <summary>Text key of the line that explains the primary button; takes the client names.</summary>
+            public string ExplainKey;
+            /// <summary>One line per client whose game settings are not in place, with what to do.</summary>
+            public List<string> SetupLines = new List<string>();
+        }
+
+        /// <summary>
+        /// <paramref name="oneClick"/> is what the primary button acts on,
+        /// <paramref name="withAddon"/> the clients that carry WowVision.
+        ///
+        /// Game settings that are not in place are named per client. The run
+        /// behind the primary button has always written them; what was missing
+        /// is saying so, on a screen that otherwise read "up to date". With
+        /// nothing to update and a setting to write, the same button in the
+        /// same place is named for what it will do.
+        /// </summary>
+        public static OpeningText Opening(List<InstallTarget> all, List<InstallTarget> withAddon,
+                                          List<InstallTarget> oneClick)
+        {
+            var text = new OpeningText();
+            bool anyAddon = withAddon.Count > 0;
+            bool anyUpdate = all.Exists(t => t.UpdateAvailable);
+            bool canFinish = false;
+
+            foreach (var t in withAddon)
+            {
+                switch (t.Setup)
+                {
+                    case SetupState.CanFinish:
+                        canFinish = true;
+                        text.SetupLines.Add(Loc.Format("update.setupCanFinish", t.DisplayName));
+                        break;
+                    case SetupState.NeedsFirstLogin:
+                        text.SetupLines.Add(Loc.Format("update.setupFirstLogin", t.DisplayName));
+                        break;
+                }
+            }
+
+            if (oneClick.Count == 0) text.HeadingKey = "update.heading.noClient";
+            else if (!anyAddon) text.HeadingKey = "update.heading.notInstalled";
+            else if (anyUpdate) text.HeadingKey = "update.heading.available";
+            else if (text.SetupLines.Count > 0) text.HeadingKey = "update.heading.setup";
+            else text.HeadingKey = "update.heading.current";
+
+            bool finishOnly = anyAddon && !anyUpdate && canFinish;
+            text.PrimaryStem = finishOnly ? "update.finish" : anyAddon ? "update.update" : "update.install";
+            text.ExplainKey = finishOnly ? "update.explainFinish"
+                : anyAddon ? "update.explainUpdate" : "update.explainInstall";
+            return text;
+        }
+
         /// <summary>True if the main WowVision folder exists under this AddOns folder.</summary>
         internal static bool AddonInstalled(string addonsFolder) =>
             !string.IsNullOrEmpty(addonsFolder) &&
@@ -48,6 +109,12 @@ namespace WowVisionInstaller
 
         /// <summary>True when WowVision is already installed in this client.</summary>
         public bool HasAddon => !string.IsNullOrEmpty(AddOnsPath) && AddonInstalled(AddOnsPath);
+
+        /// <summary>
+        /// Whether this client's game settings are in place. Only asked where
+        /// WowVision is installed: before that, the install itself is the news.
+        /// </summary>
+        public SetupState Setup => HasAddon ? GameSettings.State(AddOnsPath) : SetupState.Complete;
 
         /// <summary>True when this client is present on the machine at all.</summary>
         public bool ClientFound => !string.IsNullOrEmpty(AddOnsPath);

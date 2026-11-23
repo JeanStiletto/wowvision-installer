@@ -377,6 +377,11 @@ namespace WowVisionInstaller
             forwarded.Append(UpdatedSwitch);
 
             Logger.Info($"Restarting: {running} {forwarded}");
+            // Let go of the session log before the new instance starts: it
+            // begins by renaming this file, and a file still held open here
+            // cannot be renamed. Without this the run after a self-update, the
+            // one that installs, could be left without a log on disk.
+            Logger.StopSessionFile();
             Process.Start(new ProcessStartInfo
             {
                 FileName = running,
