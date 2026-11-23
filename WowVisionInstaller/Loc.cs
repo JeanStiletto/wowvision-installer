@@ -250,6 +250,7 @@ namespace WowVisionInstaller
             ["gs.setAccount"]        = "Game setting: {0} = {1} (account).",
             ["gs.deferred"]          = "Game setting: {0} will be set after your first login (no account profile yet).",
             ["gs.noWtf"]             = "Game settings: no WTF folder here; skipped.",
+            ["gs.failed"]            = "Game setting: {0} could NOT be written to {1}: {2}. Close the game and run the updater again; if this stays, the file or folder may be read-only.",
 
             // ── SAPI2SR NVDA voice bridge (Sapi2SrInstaller progress) ────────
             ["sapi2sr.installing"]   = "NVDA voice: installing the SAPI2SR bridge…",
@@ -286,6 +287,8 @@ namespace WowVisionInstaller
             ["managed.notForClient"] = "{0}: not available for {1}, skipped.",
             ["managed.badHash"]      = "{0}: the download failed its integrity check and was not installed.",
             ["managed.obsoleteRemoved"] = "{0}: removed the old folder {1}, which would clash with the new version.",
+            ["managed.lookupFailed"] = "Could not check online for newer versions of: {0}. {1} did not answer. The versions built into this installer are used instead and may be out of date.",
+            ["managed.builtIn"]      = "built-in {0}",
             ["update.managedUpdates"]  = "{0}: updates available for additional addons: {1}.",
             ["update.managedInstalls"] = "{0}: additional addons that will be installed: {1}.",
             ["ai.upToDate"]          = "{0}: up to date ({1}).",
@@ -500,6 +503,7 @@ namespace WowVisionInstaller
             ["gs.setAccount"]        = "Spieleinstellung: {0} = {1} (Account).",
             ["gs.deferred"]          = "Spieleinstellung: {0} wird nach deinem ersten Login gesetzt (noch kein Account-Profil vorhanden).",
             ["gs.noWtf"]             = "Spieleinstellungen: kein WTF-Ordner hier; übersprungen.",
+            ["gs.failed"]            = "Spieleinstellung: {0} konnte NICHT in {1} geschrieben werden: {2}. Schließe das Spiel und starte den Updater erneut; bleibt es so, ist die Datei oder der Ordner vielleicht schreibgeschützt.",
 
             // ── NVDA-Sprachbrücke (SAPI2SR) ──────────────────────────────────
             ["sapi2sr.installing"]   = "NVDA-Stimme: installiere die SAPI2SR-Brücke…",
@@ -536,6 +540,8 @@ namespace WowVisionInstaller
             ["managed.notForClient"] = "{0}: für {1} nicht verfügbar, übersprungen.",
             ["managed.badHash"]      = "{0}: Der Download hat die Integritätsprüfung nicht bestanden und wurde nicht installiert.",
             ["managed.obsoleteRemoved"] = "{0}: alten Ordner {1} entfernt, er würde mit der neuen Fassung kollidieren.",
+            ["managed.lookupFailed"] = "Konnte online nicht nach neueren Versionen suchen für: {0}. {1} hat nicht geantwortet. Stattdessen werden die im Installer eingebauten Versionen verwendet; sie sind möglicherweise veraltet.",
+            ["managed.builtIn"]      = "eingebaut {0}",
             ["update.managedUpdates"]  = "{0}: Updates für zusätzliche AddOns verfügbar: {1}.",
             ["update.managedInstalls"] = "{0}: Zusätzliche AddOns, die neu installiert werden: {1}.",
             ["ai.upToDate"]          = "{0}: aktuell ({1}).",
@@ -753,6 +759,7 @@ namespace WowVisionInstaller
             ["gs.setAccount"]        = "Réglage du jeu : {0} = {1} (compte).",
             ["gs.deferred"]          = "Réglage du jeu : {0} sera défini après votre première connexion (pas encore de profil de compte).",
             ["gs.noWtf"]             = "Réglages du jeu : pas de dossier WTF ici ; ignoré.",
+            ["gs.failed"]            = "Réglage du jeu : {0} n'a PAS pu être écrit dans {1} : {2}. Fermez le jeu et relancez le programme de mise à jour ; si cela persiste, le fichier ou le dossier est peut-être en lecture seule.",
 
             // ── passerelle vocale NVDA (SAPI2SR) ─────────────────────────────
             ["sapi2sr.installing"]   = "Voix NVDA : installation de la passerelle SAPI2SR…",
@@ -789,6 +796,8 @@ namespace WowVisionInstaller
             ["managed.notForClient"] = "{0} : non disponible pour {1}, ignoré.",
             ["managed.badHash"]      = "{0} : le téléchargement a échoué au contrôle d'intégrité et n'a pas été installé.",
             ["managed.obsoleteRemoved"] = "{0} : ancien dossier {1} supprimé, il entrerait en conflit avec la nouvelle version.",
+            ["managed.lookupFailed"] = "Impossible de vérifier en ligne les nouvelles versions de : {0}. {1} n'a pas répondu. Les versions intégrées à cet installateur sont utilisées à la place et peuvent être obsolètes.",
+            ["managed.builtIn"]      = "intégrée {0}",
             ["update.managedUpdates"]  = "{0} : mises à jour disponibles pour les addons supplémentaires : {1}.",
             ["update.managedInstalls"] = "{0} : addons supplémentaires qui seront installés : {1}.",
             ["ai.upToDate"]          = "{0} : à jour ({1}).",

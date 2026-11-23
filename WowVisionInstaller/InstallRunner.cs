@@ -541,6 +541,12 @@ namespace WowVisionInstaller
                 blocks.Add(string.Join(Environment.NewLine, lines));
             }
 
+            string lookupNotice = ManagedAddons.LookupFailureNotice(
+                _options.EffectiveManaged(),
+                results.Where(r => r.Plan != null && ManagedAddons.AppliesTo(r.Target)).Select(r => r.Target.Product));
+            if (lookupNotice != null)
+                blocks.Add(lookupNotice);
+
             // A rewritten TOC is only read at client start, not on /reload, so a
             // run that synced one asks for a restart too.
             bool restart = NeedsGameClosed(results) ||

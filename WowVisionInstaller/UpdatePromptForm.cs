@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
@@ -238,6 +239,13 @@ namespace WowVisionInstaller
                 if (managedInstalls.Count > 0)
                     sb.AppendLine(Loc.Format("update.managedInstalls", t.DisplayName, string.Join(", ", managedInstalls)));
             }
+
+            // A lookup that failed is said here, not just logged: otherwise the
+            // player gets the built-in version and believes it is the newest.
+            string lookupNotice = ManagedAddons.LookupFailureNotice(
+                prefs, OneClickTargets.Where(ManagedAddons.AppliesTo).Select(t => t.Product));
+            if (lookupNotice != null)
+                sb.AppendLine(lookupNotice);
 
             sb.AppendLine();
 

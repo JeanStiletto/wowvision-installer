@@ -232,7 +232,9 @@ There is no uninstaller, because there is nothing to uninstall beyond files:
 - `WowVisionInstall.json` in each AddOns folder (which release each folder came from),
 - the two setting lines in `Config.wtf` and `config-cache.wtf`,
 - `%LOCALAPPDATA%\WowVisionUpdater` (the updater copy and `WowVisionPaths.txt`,
-  the remembered game folders, mirrored in `%ProgramData%\WowVisionUpdater`),
+  the remembered game folders, mirrored in `%ProgramData%\WowVisionUpdater`;
+  and `Logs\installer-run1.log` to `run3`, the installer's own log of this run
+  and the two before it, which the log bundle carries),
 - the "WowVision Updater" shortcuts,
 - the extra addons' folders and `WowVisionManagedAddons.txt`,
 - the `WoW Login Tool` folder at the WoW base, its shortcuts, and for

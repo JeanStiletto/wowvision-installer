@@ -317,6 +317,8 @@ namespace WowVisionInstaller
                 Console.WriteLine("=== game settings ===");
                 string fwd = wow.AddOns[Config.ForeverFlavor];
                 Check("both blockers reported on a fresh WTF", GameSettings.CheckNeeded(fwd).Count == GameSettings.Required.Length);
+                Check("a trailing backslash on the AddOns path finds the same WTF",
+                      GameSettings.CheckNeeded(fwd + "\\").Count == GameSettings.Required.Length);
                 GameSettings.Apply(fwd, m => Console.WriteLine("    " + m));
                 Check("written into that client's own WTF",
                       File.ReadAllText(Path.Combine(wow.FlavorDir[Config.ForeverFlavor], "WTF", "Config.wtf")).Contains("SET checkAddonVersion \"0\"") &&
@@ -324,6 +326,17 @@ namespace WowVisionInstaller
                           .Contains("SET AllowDangerousScripts \"1\""));
                 Check("nothing left to fix afterwards", GameSettings.CheckNeeded(fwd).Count == 0);
                 Check("other clients untouched", !File.Exists(Path.Combine(wow.FlavorDir[Config.MistsFlavor], "WTF", "Config.wtf")));
+
+                // A file that cannot be written is said out loud, not only logged.
+                string lockedCache = Path.Combine(wow.FlavorDir[Config.ForeverFlavor], "WTF", "Account", "TESTACCOUNT", "config-cache.wtf");
+                File.WriteAllText(lockedCache, "SET AllowDangerousScripts \"0\"\r\n");
+                File.SetAttributes(lockedCache, FileAttributes.ReadOnly);
+                var said = new List<string>();
+                try { GameSettings.Apply(fwd, said.Add); }
+                finally { File.SetAttributes(lockedCache, FileAttributes.Normal); }
+                foreach (var m in said) Console.WriteLine("    " + m);
+                Check("a failed write is reported with its file", said.Any(m => m.Contains(lockedCache)));
+                Check("and the setting is still reported as needed", GameSettings.CheckNeeded(fwd).Count == 1);
 
                 Console.WriteLine("=== status lines ===");
                 Config.SetChannel(Channel.Stable);
@@ -651,6 +664,14 @@ namespace WowVisionInstaller
         private static string Placeholders(string s) =>
             string.Join(",", Regex.Matches(s, @"\{(\d+)\}").Cast<Match>().Select(m => m.Groups[1].Value).Distinct().OrderBy(x => x));
 
+        /// <summary>Reads a file the logger may still hold open for writing.</summary>
+        private static string ReadShared(string path)
+        {
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var r = new StreamReader(fs))
+                return r.ReadToEnd();
+        }
+
         private static void RunLogTest()
         {
             Console.WriteLine("=== logtest: the log bundle ===");
@@ -663,6 +684,22 @@ namespace WowVisionInstaller
                 File.WriteAllText(Path.Combine(fwd, "WTF", "Account", "TESTACCOUNT", "SavedVariables", "Unrelated.lua"), "x = 1\n");
                 Directory.CreateDirectory(Path.Combine(fwd, "Logs"));
                 File.WriteAllText(Path.Combine(fwd, "Logs", "General.log"), "an error\n");
+                File.WriteAllText(Path.Combine(fwd, "WTF", "Account", "TESTACCOUNT", "config-cache.wtf"), "SET AllowDangerousScripts \"1\"\r\n");
+
+                // Four runs of the installer: the last three are kept, newest as run1.
+                Logger.DirOverride = Path.Combine(wow.Root, "installer-logs");
+                for (int run = 1; run <= 4; run++)
+                {
+                    Logger.StartSessionFile();
+                    Logger.Info("logtest marker run " + run);
+                }
+                Check("three session logs kept, the oldest dropped",
+                      File.Exists(Logger.SessionFile(3)) && !File.Exists(Logger.SessionFile(4)) &&
+                      ReadShared(Logger.SessionFile(3)).Contains("logtest marker run 2"));
+                Check("the run before is run2",
+                      ReadShared(Logger.SessionFile(2)).Contains("logtest marker run 3") &&
+                      !ReadShared(Logger.SessionFile(2)).Contains("logtest marker run 4"));
+                Check("the running session is on disk while it runs", ReadShared(Logger.SessionFile(1)).Contains("logtest marker run 4"));
 
                 string downloads = Path.Combine(wow.Root, "Downloads");
                 Directory.CreateDirectory(downloads);
@@ -685,9 +722,19 @@ namespace WowVisionInstaller
                         string info = new StreamReader(zip.GetEntry("system-info.txt").Open()).ReadToEnd();
                         Check("system-info names the TOC Forever reads", info.Contains("WowVision_Camelot.toc"));
                         Check("all five clients covered", result.ClientCount == 5);
+                        Check("the account's config-cache.wtf", names.Contains("Forever/accounts/TESTACCOUNT/config-cache.wtf"));
+                        Check("the installer's three session logs",
+                              Enumerable.Range(1, 3).All(n => names.Contains($"installer/installer-run{n}.log")));
+                        string run1 = new StreamReader(zip.GetEntry("installer/installer-run1.log").Open()).ReadToEnd();
+                        Check("the running session's log is in the bundle", run1.Contains("logtest marker run 4"));
                     }
                 }
-                finally { LogCollector.DownloadsOverride = null; }
+                finally
+                {
+                    LogCollector.DownloadsOverride = null;
+                    Logger.StopSessionFile();
+                    Logger.DirOverride = null;
+                }
             }
         }
 
@@ -734,6 +781,39 @@ namespace WowVisionInstaller
                     Check($"{p.Key}: pin {pinFile} reads as {p.PinVersion}",
                           m.Success && m.Groups[1].Value == p.PinVersion);
                 }
+
+            Console.WriteLine("=== cursetest: a failed lookup is said to the player ===");
+            var lang = Loc.Current;
+            Loc.Set(Lang.En);
+            var all = ManagedAddons.Entries.ToDictionary(e => e.PrefKey, e => true);
+            var forever = new[] { Config.ForeverFlavor };
+            var details = ManagedAddons.Entries.Find(e => e.PrefKey == "ManageDetails").Packages[0];
+
+            ManagedAddons.SeedPins();   // nothing looked up: every lookup counts as failed
+            string notice = ManagedAddons.LookupFailureNotice(all, forever);
+            Check("no lookup: the notice names Details with its built-in version",
+                  notice != null && notice.Contains("Details Damage Meter (built-in " + details.PinVersion + ")"));
+            Check("no lookup: both sources are named", notice != null &&
+                  notice.Contains("CurseForge") && notice.Contains("GitHub"));
+            var noDetails = new Dictionary<string, bool>(all) { ["ManageDetails"] = false };
+            string without = ManagedAddons.LookupFailureNotice(noDetails, forever);
+            Check("an addon switched off is not named", without != null && !without.Contains("Details"));
+            Check("no client with extra addons: no notice",
+                  ManagedAddons.LookupFailureNotice(all, new string[0]) == null);
+
+            foreach (var e in ManagedAddons.Entries)
+                foreach (var p in e.Packages)
+                    if (!string.IsNullOrEmpty(p.GitHubRepo))
+                        ManagedAddons.SetResolved(new ResolvedManagedPackage { Package = p, Version = p.PinVersion, Url = p.PinUrl });
+            notice = ManagedAddons.LookupFailureNotice(all, forever);
+            Check("only CurseForge failed: only CurseForge is named", notice != null &&
+                  notice.Contains("CurseForge") && !notice.Contains("GitHub") && !notice.Contains("Questie"));
+
+            foreach (var e in ManagedAddons.Entries)
+                foreach (var p in e.Packages)
+                    ManagedAddons.SetResolved(new ResolvedManagedPackage { Package = p, Version = p.PinVersion, Url = p.PinUrl });
+            Check("every lookup worked: no notice", ManagedAddons.LookupFailureNotice(all, forever) == null);
+            Loc.Set(lang);
         }
 
         private static void RunCurseLive()
