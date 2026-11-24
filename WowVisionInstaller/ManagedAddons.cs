@@ -234,9 +234,9 @@ namespace WowVisionInstaller
                         // newest of the three files is taken. The older name stays
                         // accepted.
                         CurseFilePattern = @"^AtlasLoot(?:Classic-Continued|Continued-(?:ERA|Anniversary|Forever))_(\d+)\.zip$",
-                        PinVersion = "12993",
-                        PinUrl = "https://edge.forgecdn.net/files/9767/288/AtlasLootContinued-Forever_12993.zip",
-                        PinSha256 = "4e84f3229b473e7d99a2d68dda18e6c0f0504ad10ba7b0735436ef58199e0650",
+                        PinVersion = "12997",
+                        PinUrl = "https://edge.forgecdn.net/files/9785/961/AtlasLootContinued-Forever_12997.zip",
+                        PinSha256 = "e01132b595cd0d9f37cb67ef4da594821590f7823403940cc594d00f1133e1cc",
                     },
                 },
             },
@@ -395,9 +395,9 @@ namespace WowVisionInstaller
                         // would load the retail GTFO_Mainline.toc on WoW Forever.
                         CurseProjectId = 20697,
                         CurseFilePattern = @"^GTFO-(\d[\d.]*)\.zip$",
-                        PinVersion = "6.12.3",
-                        PinUrl = "https://edge.forgecdn.net/files/9468/96/GTFO-6.12.3.zip",
-                        PinSha256 = "b2bf8a06ca5276eff4c70c40f5698800650a037c5a1be2b008774b871a24dc78",
+                        PinVersion = "6.12.4",
+                        PinUrl = "https://edge.forgecdn.net/files/9695/357/GTFO-6.12.4.zip",
+                        PinSha256 = "d23b6097944d3dfa5d6958df5a3c6182e2c628657b19654c50278baaf504c14e",
                     },
                 },
             },
@@ -624,13 +624,72 @@ namespace WowVisionInstaller
         /// Manifest value recorded when a package's zip turned out to carry no TOC
         /// for the client (a release that dropped it). Keeps the next run from
         /// downloading the same zip again; a newer release is tried afresh.
+        ///
+        /// The "@2" is the rule's generation. Markers written before installer
+        /// 1.8 read "unavailable:&lt;version&gt;" and came from a check that did
+        /// not know WoW Forever's _Forever TOCs: they wrongly parked Questie on
+        /// that client. They no longer match, so such a package is tried again
+        /// once. Raise the number whenever the check learns something that could
+        /// turn an old "unavailable" into "available".
         /// </summary>
-        internal static string UnavailableMarker(string version) => "unavailable:" + version;
+        internal static string UnavailableMarker(string version) => "unavailable@2:" + version;
 
         /// <summary>True when this release of the package was found unusable for this client.</summary>
         internal static bool KnownUnavailable(InstallManifest manifest, ManagedPackage pkg) =>
             string.Equals(manifest.GetTag(pkg.Key), UnavailableMarker(Resolved(pkg).Version),
                           StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Compares two versions of ONE package by the numbers in them, left to
+        /// right: "6.12.4" is newer than "6.12.3", "r837" than "r835",
+        /// "bundle/v12.13.0+v1.1.5" than "bundle/v12.11.1+v1.1.3". Positive when
+        /// <paramref name="a"/> is the newer one, 0 when they are the same or
+        /// carry no numbers to tell by.
+        /// </summary>
+        internal static int CompareVersions(string a, string b)
+        {
+            var x = VersionNumbers(a);
+            var y = VersionNumbers(b);
+            for (int i = 0; i < Math.Min(x.Count, y.Count); i++)
+                if (x[i] != y[i]) return x[i] > y[i] ? 1 : -1;
+            return x.Count.CompareTo(y.Count);
+        }
+
+        private static List<decimal> VersionNumbers(string version)
+        {
+            var numbers = new List<decimal>();
+            var digits = new System.Text.StringBuilder();
+            foreach (char c in (version ?? "") + " ")
+            {
+                if (c >= '0' && c <= '9') { digits.Append(c); continue; }
+                if (digits.Length == 0) continue;
+                numbers.Add(decimal.TryParse(digits.ToString(), out decimal n) ? n : 0);
+                digits.Clear();
+            }
+            return numbers;
+        }
+
+        /// <summary>
+        /// True when the package's newest release could not be looked up this
+        /// run and what is installed is NEWER than the built-in version the
+        /// installer fell back to. The installed one is then kept: without this
+        /// a single refused or timed-out lookup put the older built-in version
+        /// over it, and the next working lookup put the newer one back. A
+        /// built-in version that is newer than the installed one is still
+        /// installed: that is how a player CurseForge refuses (HTTP 403 for
+        /// every program, reported 2026-11-24) gets updates at all.
+        /// A lookup that WORKED is always followed, also back to an older release.
+        /// </summary>
+        internal static bool KeepsNewerInstall(string addonsFolder, InstallManifest manifest, ManagedPackage pkg)
+        {
+            var resolved = Resolved(pkg);
+            if (resolved.LookupFailedSource == null) return false;
+            string current = manifest.GetTag(pkg.Key);
+            if (string.IsNullOrEmpty(current) ||
+                current.StartsWith("unavailable", StringComparison.OrdinalIgnoreCase)) return false;
+            if (pkg.RequiredRoots.Any(r => !Directory.Exists(Path.Combine(addonsFolder, r)))) return false;
+            return CompareVersions(current, resolved.Version) > 0;
+        }
 
         /// <summary>True when every required folder of every applicable package exists on disk.</summary>
         public static bool EntryInstalled(string addonsFolder, string product, ManagedEntry entry) =>
@@ -651,7 +710,8 @@ namespace WowVisionInstaller
                 if (KnownUnavailable(manifest, pkg)) continue;
                 var resolved = Resolved(pkg);
                 string current = manifest.GetTag(pkg.Key);
-                if (!string.Equals(current, resolved.Version, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(current, resolved.Version, StringComparison.OrdinalIgnoreCase) &&
+                    !KeepsNewerInstall(addonsFolder, manifest, pkg))
                     return true;
                 if (pkg.RequiredRoots.Any(r => !Directory.Exists(Path.Combine(addonsFolder, r))))
                     return true;
@@ -798,11 +858,14 @@ namespace WowVisionInstaller
                 return true;
             }
 
+            bool keepsNewer = !force && ManagedAddons.KeepsNewerInstall(addonsFolder, manifest, pkg);
+            if (keepsNewer)
+                Logger.Info($"{pkg.Key}: installed {current} is newer than the built-in {resolved.Version}; kept.");
             if (!force && rootsPresent &&
-                string.Equals(current, resolved.Version, StringComparison.OrdinalIgnoreCase))
+                (keepsNewer || string.Equals(current, resolved.Version, StringComparison.OrdinalIgnoreCase)))
             {
                 report(new InstallProgress { Addon = entry.DisplayName, Phase = "skip",
-                    Percent = 100, Message = Loc.Format("ai.upToDate", entry.DisplayName, resolved.Version) });
+                    Percent = 100, Message = Loc.Format("ai.upToDate", entry.DisplayName, keepsNewer ? current : resolved.Version) });
                 return RemoveObsoleteRoots(addonsFolder, entry, pkg, report);
             }
 

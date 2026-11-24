@@ -956,7 +956,10 @@ namespace WowVisionInstaller
             Check("and the built-in version stays in use, with its checksum",
                   ManagedAddons.Resolved(atlas).Version == atlas.PinVersion && ManagedAddons.Resolved(atlas).Sha256 == atlas.PinSha256);
             ManagedAddons.SeedPins();
-            ManagedAddons.ApplyCurseLookup(atlas, CurseForge.Read(atlasJson, atlas.CurseFilePattern));
+            // The listing's newest file, renamed to whatever the pin is now, so this
+            // check does not break each time the pin is refreshed.
+            ManagedAddons.ApplyCurseLookup(atlas, CurseForge.Read(
+                atlasJson.Replace("_12993.zip", "_" + atlas.PinVersion + ".zip"), atlas.CurseFilePattern));
             Check("answered with the pinned file: no notice, the pin's checksum kept",
                   ManagedAddons.LookupFailureNotice(onlyAtlas, forever) == null &&
                   ManagedAddons.Resolved(atlas).Sha256 == atlas.PinSha256);
@@ -1002,6 +1005,83 @@ namespace WowVisionInstaller
                 Check("a suffix TOC serves its client", WowLocator.FolderServesClient(root, "WowVision", Config.MistsFlavor));
                 Check("a folder without a TOC for the client does not",
                       !WowLocator.FolderServesClient(root, "WowVision", Config.RetailFlavor));
+
+                // Questie since 12.11.0: a plain TOC that lists no real interface,
+                // and its WoW Forever TOC under the name Forever, not Camelot.
+                string questie = Path.Combine(root, "Questie");
+                Directory.CreateDirectory(questie);
+                File.WriteAllText(Path.Combine(questie, "Questie.toc"), "## Interface: 00000\n");
+                File.WriteAllText(Path.Combine(questie, "Questie_Vanilla.toc"), "## Interface: 11508, 11509\n");
+                Check("a plain TOC with interface 00000 serves nobody by itself",
+                      !WowLocator.FolderServesClient(root, "Questie", Config.ForeverFlavor));
+                File.WriteAllText(Path.Combine(questie, "Questie_Forever.toc"), "## Interface: 16001\n");
+                Check("WoW Forever reads <Addon>_Forever.toc",
+                      WowLocator.FolderServesClient(root, "Questie", Config.ForeverFlavor));
+                Check("and that TOC is the one named for the client",
+                      Path.GetFileName(WowLocator.TocFor(root, "Questie", Config.ForeverFlavor, out bool foreverSuffix)) == "Questie_Forever.toc"
+                      && foreverSuffix);
+                string trace = Path.Combine(root, "QuestieTrace");
+                Directory.CreateDirectory(trace);
+                File.WriteAllText(Path.Combine(trace, "QuestieTrace-Forever.toc"), "## Interface: 16001\n");
+                Check("with a hyphen too", WowLocator.FolderServesClient(root, "QuestieTrace", Config.ForeverFlavor));
+                Check("a Forever TOC serves no other client",
+                      !WowLocator.FolderServesClient(root, "QuestieTrace", Config.AnniversaryFlavor)
+                      && !WowLocator.FolderServesClient(root, "QuestieTrace", Config.RetailFlavor));
+                File.WriteAllText(Path.Combine(wv, "WowVision_Forever.toc"), "## Interface: 16001\n");
+                File.WriteAllText(Path.Combine(wv, "WowVision_Camelot.toc"), "## Interface: 16001\n");
+                Check("Camelot is preferred over Forever",
+                      Path.GetFileName(WowLocator.TocFor(root, "WowVision", Config.ForeverFlavor, out _)) == "WowVision_Camelot.toc");
+
+                // A failed lookup never puts an older built-in version over a newer
+                // installed one; a newer built-in version is still installed.
+                Check("versions compare by their numbers",
+                      ManagedAddons.CompareVersions("6.12.4", "6.12.3") > 0 &&
+                      ManagedAddons.CompareVersions("r835", "r837") < 0 &&
+                      ManagedAddons.CompareVersions("12997", "12993") > 0 &&
+                      ManagedAddons.CompareVersions("Pawn-2.14.8", "Pawn-2.14.4") > 0 &&
+                      ManagedAddons.CompareVersions("6.12.10", "6.12.9") > 0 &&
+                      ManagedAddons.CompareVersions("bundle/v12.13.0+v1.1.5", "bundle/v12.11.1+v1.1.3") > 0 &&
+                      ManagedAddons.CompareVersions("20261109.15410.172", "20261024.15000.170") > 0 &&
+                      ManagedAddons.CompareVersions("v12.1.9", "V12.1.9") == 0 &&
+                      ManagedAddons.CompareVersions("12.1", "12.1.1") < 0 &&
+                      ManagedAddons.CompareVersions("beta", "alpha") == 0);
+                var gtfoEntry = ManagedAddons.Entries.Find(e => e.PrefKey == "ManageGTFO");
+                var gtfo = gtfoEntry.Packages[0];
+                Directory.CreateDirectory(Path.Combine(root, "GTFO"));
+                ManagedAddons.SeedPins();   // every lookup counts as failed: the pin is in use
+                var have = new InstallManifest();
+                have.SetTag(gtfo.Key, "99.0.0");
+                Check("lookup failed, installed is newer than the built-in: kept",
+                      ManagedAddons.KeepsNewerInstall(root, have, gtfo) &&
+                      !ManagedAddons.EntryNeedsWork(root, Config.EraFlavor, have, gtfoEntry));
+                have.SetTag(gtfo.Key, "1.0.0");
+                Check("lookup failed, the built-in is newer: installed",
+                      !ManagedAddons.KeepsNewerInstall(root, have, gtfo) &&
+                      ManagedAddons.EntryNeedsWork(root, Config.EraFlavor, have, gtfoEntry));
+                have.SetTag(gtfo.Key, "99.0.0");
+                ManagedAddons.SetResolved(new ResolvedManagedPackage { Package = gtfo, Version = gtfo.PinVersion, Url = gtfo.PinUrl });
+                Check("a lookup that worked is followed, also back to an older release",
+                      !ManagedAddons.KeepsNewerInstall(root, have, gtfo) &&
+                      ManagedAddons.EntryNeedsWork(root, Config.EraFlavor, have, gtfoEntry));
+                ManagedAddons.SeedPins();
+                Directory.Delete(Path.Combine(root, "GTFO"), true);
+                Check("a newer record without its folder is installed all the same",
+                      !ManagedAddons.KeepsNewerInstall(root, have, gtfo) &&
+                      ManagedAddons.EntryNeedsWork(root, Config.EraFlavor, have, gtfoEntry));
+
+                // A marker of the old rule must not park the package any longer.
+                var questiePkg = ManagedAddons.Entries.Find(e => e.PrefKey == "ManageQuestie").Packages[0];
+                ManagedAddons.SeedPins();
+                string resolvedVersion = ManagedAddons.Resolved(questiePkg).Version;
+                var parked = new InstallManifest();
+                parked.SetTag(questiePkg.Key, "unavailable:" + resolvedVersion);
+                Check("an 'unavailable' marker from before 1.8 is not believed",
+                      !ManagedAddons.KnownUnavailable(parked, questiePkg));
+                Check("so Questie is planned again",
+                      ManagedAddons.EntryNeedsWork(root, Config.ForeverFlavor, parked,
+                                                   ManagedAddons.Entries.Find(e => e.PrefKey == "ManageQuestie")));
+                parked.SetTag(questiePkg.Key, ManagedAddons.UnavailableMarker(resolvedVersion));
+                Check("a marker of the current rule is", ManagedAddons.KnownUnavailable(parked, questiePkg));
             }
             finally { try { Directory.Delete(root, true); } catch { } }
 
@@ -1077,9 +1157,14 @@ namespace WowVisionInstaller
                     if (!ok)
                         foreach (string line in Logger.Snapshot().Where(l => l.Contains("WARN:") || l.Contains("ERROR:")).Reverse().Take(6).Reverse())
                             Console.WriteLine("      log: " + line);
+                    // Every entry is listed for this client on purpose, so one that is
+                    // "found unusable and skipped" is a FAILURE here: either the
+                    // addon dropped the client (take it off the list) or our check
+                    // misreads its TOCs. Counting it as a pass hid Questie being
+                    // skipped on WoW Forever (2026-11-24).
                     bool unavailable = ManagedAddons.PackagesFor(entry, product).Any(p => ManagedAddons.KnownUnavailable(manifest, p));
-                    Check(entry.DisplayName + (unavailable ? " found unusable and skipped" : " installed"),
-                          ok && (unavailable || ManagedAddons.EntryInstalled(addons, product, entry)));
+                    Check(entry.DisplayName + (unavailable ? " installed (it was skipped as not for this client)" : " installed"),
+                          ok && !unavailable && ManagedAddons.EntryInstalled(addons, product, entry));
                     foreach (var p in ManagedAddons.PackagesFor(entry, product))
                         if (!ManagedAddons.KnownUnavailable(manifest, p))
                             Check($"{p.Key} carries a TOC this client loads",

@@ -101,8 +101,14 @@ namespace WowVisionInstaller
         /// </summary>
         public static readonly ClientInfo[] Clients =
         {
+            // WoW Forever loads <Addon>_Camelot.toc (its code name, WowVision's own
+            // TOC) and <Addon>_Forever.toc alike. Questie dropped its Camelot TOC
+            // for the Forever one on 2026-11-17, and its plain TOC lists interface
+            // 00000: with "Camelot" alone here, every Questie since 12.11.0 was
+            // judged "not available for WoW Forever" and skipped (reported
+            // 2026-11-24). QuestieTrace and AtlasLoot use the Forever name too.
             new ClientInfo { Product = Config.ForeverFlavor, Folder = "_forever_", Label = "WoW Forever",
-                             Short = "Forever", TocSuffixes = new[] { "Camelot" }, LoginTool = LoginToolMode.ToolOnly,
+                             Short = "Forever", TocSuffixes = new[] { "Camelot", "Forever" }, LoginTool = LoginToolMode.ToolOnly,
                              InterfaceMin = 16000, InterfaceMax = 19999 },
             new ClientInfo { Product = Config.AnniversaryFlavor, Folder = "_anniversary_", Label = "Anniversary (TBC)",
                              Short = "TBC", TocSuffixes = new[] { "TBC", "BCC", "Classic" }, LoginTool = LoginToolMode.WithTextures,

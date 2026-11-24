@@ -39,7 +39,9 @@ Offered in this order. For each: the folder, the TOC it reads, the interface
 numbers that belong to it.
 
 - WoW Forever: `_forever_` (product `wowf`; the beta was `_classic_beta_`),
-  `WowVision_Camelot.toc`, 16000 to 19999. When `_forever_` has no WowVision
+  `WowVision_Camelot.toc`, 16000 to 19999. The client also loads
+  `<Addon>_Forever.toc`, the name Questie and others use, so both suffixes
+  count as written for it (since 1.8). When `_forever_` has no WowVision
   yet but `_classic_beta_` beside it does, the live folder is ticked and in
   "Update now" (the game moved there when the beta ended), and a folder
   remembered from the beta gives way to it.
@@ -156,7 +158,12 @@ follows.
   package instead of being installed. The zip comes from the file server
   (`edge.forgecdn.net/files/<id / 1000>/<id % 1000>/<name>`) and must have the
   size the listing gives. Whatever cannot be read, from GitHub or CurseForge,
-  falls back to the package's pin: a fixed file with its SHA-256.
+  falls back to the package's pin: a fixed file with its SHA-256. After a
+  failed lookup the pin is only installed when it is newer than what is
+  there (since 1.8): CurseForge answers some players with HTTP 403 for every
+  program, so for them the pins are the only updates, and for everyone else
+  one failed lookup must not put an older file over a newer one. Refresh the
+  CurseForge pins with each release for that reason.
 
 ## Rules worth knowing
 
