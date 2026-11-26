@@ -1093,6 +1093,28 @@ namespace WowVisionInstaller
             Check("Mists: no tool (it has no Mists screen data)", !LoginToolInstaller.ClientSupported(Config.MistsFlavor));
             Check("Retail: no tool", !LoginToolInstaller.ClientSupported(Config.RetailFlavor));
 
+            Console.WriteLine("=== login tool: version check ===");
+            Check("4.3 is newer than 4.2", LoginToolInstaller.IsNewer("4.3", "4.2"));
+            Check("4.10 is newer than 4.9", LoginToolInstaller.IsNewer("4.10", "4.9"));
+            Check("4.2 is not newer than 4.2", !LoginToolInstaller.IsNewer("4.2", "4.2"));
+            Check("4.2 = 4.2.0", !LoginToolInstaller.IsNewer("4.2.0", "4.2") && !LoginToolInstaller.IsNewer("4.2", "4.2.0"));
+            Check("4.2 is not newer than a tester's 4.3", !LoginToolInstaller.IsNewer("4.2", "4.3"));
+            Check("no marker counts as oldest", LoginToolInstaller.IsNewer("4.2", null));
+            Check("an old release tag marker counts as oldest", LoginToolInstaller.IsNewer("4.2", "v42.04"));
+            Check("unknown published version: no upgrade", !LoginToolInstaller.IsNewer(null, "4.1"));
+            Check("junk published version: no upgrade", !LoginToolInstaller.IsNewer("<html>", "4.1"));
+            Check("version file with BOM and newline", LoginToolInstaller.VersionParts("﻿4.3\r\n")?.Length == 2);
+            string ltDir = Path.Combine(Path.GetTempPath(), "WowVisionSelfTest_ltver_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                Directory.CreateDirectory(Path.Combine(ltDir, "v2"));
+                File.WriteAllText(Path.Combine(ltDir, "v2", "START.ahk"), "global gLogX := 1\r\nglobal gToolVersion := \"4.3\"\r\n");
+                Check("deployed version read from v2\\START.ahk", LoginToolInstaller.DeployedVersion(ltDir) == "4.3");
+                File.WriteAllText(Path.Combine(ltDir, "v2", "START.ahk"), "; no version here\r\n");
+                Check("no gToolVersion: no deployed version", LoginToolInstaller.DeployedVersion(ltDir) == null);
+            }
+            finally { try { Directory.Delete(ltDir, true); } catch { } }
+
             Console.WriteLine("=== availability: extra addons ===");
             string Keys(string product) => string.Join(", ",
                 ManagedAddons.Entries.SelectMany(e => ManagedAddons.PackagesFor(e, product)).Select(p => p.Key));
@@ -1214,8 +1236,14 @@ namespace WowVisionInstaller
                     Console.WriteLine($"    tool folder: {toolDir}");
                     Check("tool folder at the WoW base", toolDir == Path.Combine(wow.Base, Config.LoginToolFolderName));
                     Check("v2\\START.ahk present", LoginToolInstaller.IsInstalled(addons));
-                    Check("version marker written",
-                          File.ReadAllText(Path.Combine(toolDir, "installed-release.txt")).Trim() == Config.LoginToolVersion);
+                    string deployed = LoginToolInstaller.DeployedVersion(toolDir);
+                    Console.WriteLine($"    deployed version: {deployed ?? "none"}");
+                    Check("version marker = the unpacked tool's version", deployed != null &&
+                          File.ReadAllText(Path.Combine(toolDir, "installed-release.txt")).Trim() == deployed);
+                    string published = LoginToolInstaller.PublishedVersion(github);
+                    Console.WriteLine($"    published version: {published ?? "unknown"}");
+                    if (published != null)
+                        Check("deployed is not older than published", !LoginToolInstaller.IsNewer(published, deployed));
                     string marker = Path.Combine(wow.FlavorDir[product], "Interface", LoginToolInstaller.FiducialMarkerRelPath);
                     if (LoginToolInstaller.ClientNeedsTextures(product))
                         Check("recognition textures in this client's Interface", File.Exists(marker));

@@ -56,8 +56,11 @@ there plus its texts.
 ## The WoW Login Tool
 
 Taken over unchanged from the Sku installer, downloaded from the Sku
-repository's rolling `login-tool` release (`Config.LoginToolRepo`,
-`Config.LoginToolVersion` 4.0 — keep in step with Sku's). Per client, from the
+repository's rolling `login-tool` release (`Config.LoginToolRepo`). Whether a
+player's copy is old is decided by `WoW-Login-Tool.version.txt` beside the zip
+(`Config.LoginToolVersionAsset`, uploaded by Sku's `release.ps1
+-PublishLoginTool`): a newer version there upgrades the copy, so a tool release
+needs no new installer. Per client, from the
 tool's own game types (`data\gametypes.ini` and `GametypeFromVersion` in the
 tool):
 

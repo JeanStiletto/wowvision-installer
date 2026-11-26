@@ -194,13 +194,15 @@ namespace WowVisionInstaller
         //
         // It ships from the Sku repository on a PERMANENT rolling tag: each new
         // build re-uploads WoW-Login-Tool.zip to the same 'login-tool' tag, so the
-        // URL never changes. LoginToolVersion is the freshness signal instead:
-        // keep it in step with the Sku installer's Config.LoginToolVersion, and
-        // LoginToolInstaller upgrades every install whose marker predates it.
+        // URL never changes. The freshness signal is the small asset beside it,
+        // LoginToolVersionAsset: one line, the version of the zip next to it
+        // (Sku's release.ps1 -PublishLoginTool uploads both). LoginToolInstaller
+        // upgrades a player's copy when that version is newer than the copy's
+        // marker, so a tool release reaches players without a new installer.
         public const string LoginToolRepo = "Sku75/Sku-WoW-Addon-TBC";
         public const string LoginToolTag = "login-tool";
-        public const string LoginToolVersion = "4.1";
         public const string LoginToolAsset = "WoW-Login-Tool.zip";
+        public const string LoginToolVersionAsset = "WoW-Login-Tool.version.txt";
         public const string LoginToolFolderName = "WoW Login Tool";
 
         // ── the game clients (see WowLocator.Clients for the full table) ────

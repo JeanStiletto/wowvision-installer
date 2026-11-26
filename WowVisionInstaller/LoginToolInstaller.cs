@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace WowVisionInstaller
@@ -23,12 +24,13 @@ namespace WowVisionInstaller
     ///      launcher shortcut points that runtime at v2\START.ahk.
     ///
     /// Everything is best-effort: failures are logged + announced but never abort
-    /// the surrounding WowVision install. Idempotent — skips a re-download when the
-    /// installed version marker already matches <see cref="Config.LoginToolVersion"/>,
-    /// unless <paramref name="force"/> is set; older installs (or pre-marker ones)
-    /// are upgraded in place, preserving the user's data\settings.ini. The download
-    /// itself always comes from the rolling <see cref="Config.LoginToolTag"/> of
-    /// the Sku repository (<see cref="Config.LoginToolRepo"/>).
+    /// the surrounding WowVision install. Idempotent — skips a re-download unless
+    /// the version published beside the zip (<see cref="Config.LoginToolVersionAsset"/>)
+    /// is newer than the installed version marker, or <paramref name="force"/> is
+    /// set; older installs (or pre-marker ones) are upgraded in place, preserving
+    /// the user's data\settings.ini. The download itself always comes from the
+    /// rolling <see cref="Config.LoginToolTag"/> of the Sku repository
+    /// (<see cref="Config.LoginToolRepo"/>).
     ///
     /// Taken over unchanged from the Sku installer. The only addition is the
     /// per-client gate (<see cref="ClientSupported"/>): the tool is installed for
@@ -82,10 +84,10 @@ namespace WowVisionInstaller
 
         /// <summary>
         /// Marker file in the tool folder recording which tool VERSION is deployed
-        /// (see <see cref="Config.LoginToolVersion"/>), so a re-run can tell
+        /// (the gToolVersion of the unpacked v2\START.ahk), so a re-run can tell
         /// "current" from "needs upgrade". Installs made by older installers hold a
-        /// release tag instead (e.g. "v42.04") or no marker at all; either way it
-        /// won't match the current version string, so they upgrade once.
+        /// release tag instead (e.g. "v42.04") or no marker at all; neither parses
+        /// as a version, so they count as oldest and upgrade once.
         /// </summary>
         private const string VersionMarkerFile = "installed-release.txt";
 
@@ -127,6 +129,64 @@ namespace WowVisionInstaller
         }
 
         /// <summary>
+        /// The tool version published on the rolling release: the one line of
+        /// <see cref="Config.LoginToolVersionAsset"/> beside the zip. Null when it
+        /// cannot be read (offline, GitHub down, or a release without the file).
+        /// </summary>
+        internal static string PublishedVersion(GitHubClient github)
+        {
+            string url = GitHubClient.BuildDownloadUrl(Config.LoginToolRepo, Config.LoginToolTag, Config.LoginToolVersionAsset);
+            string text = github.DownloadTextAsync(url, TimeSpan.FromSeconds(15)).GetAwaiter().GetResult();
+            string version = VersionParts(text) != null ? text.Trim().Trim('\uFEFF').Trim() : null;
+            Logger.Info($"WoW Login Tool: published version {version ?? "unknown"} ({url}).");
+            return version;
+        }
+
+        /// <summary>
+        /// The version of the tool now in <paramref name="toolDir"/>: gToolVersion
+        /// in its v2\START.ahk, the one place the tool keeps that number. Null when
+        /// the file or the line is missing.
+        /// </summary>
+        internal static string DeployedVersion(string toolDir)
+        {
+            try
+            {
+                string text = File.ReadAllText(Path.Combine(toolDir, "v2", "START.ahk"));
+                Match m = Regex.Match(text, "gToolVersion\\s*:=\\s*\"([^\"]+)\"");
+                return m.Success && VersionParts(m.Groups[1].Value) != null ? m.Groups[1].Value.Trim() : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>"4.2" -> {4, 2}; null for anything that is not a plain dotted version.</summary>
+        internal static int[] VersionParts(string text)
+        {
+            string v = text?.Trim().Trim('\uFEFF').Trim();
+            if (string.IsNullOrEmpty(v) || !Regex.IsMatch(v, @"^\d{1,6}(\.\d{1,6}){0,3}$")) return null;
+            return v.Split('.').Select(int.Parse).ToArray();
+        }
+
+        /// <summary>
+        /// True when <paramref name="published"/> is newer than <paramref name="installed"/>.
+        /// An unknown published version is never newer (nothing to upgrade to); a
+        /// missing or old-style marker ("v42.04") counts as oldest. Newer only, not
+        /// different: a hand-placed newer copy (a tester's build) is left alone.
+        /// </summary>
+        internal static bool IsNewer(string published, string installed)
+        {
+            int[] p = VersionParts(published);
+            if (p == null) return false;
+            int[] i = VersionParts(installed);
+            if (i == null) return true;
+            for (int n = 0; n < Math.Max(p.Length, i.Length); n++)
+            {
+                int a = n < p.Length ? p[n] : 0, b = n < i.Length ? i[n] : 0;
+                if (a != b) return a > b;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// True when the tool needs its recognition textures and font override in
         /// this client. WoW Forever narrates its own login screens (the tool only
         /// moves the mouse there, see the tool's Forever mode) and draws its UI
@@ -153,6 +213,7 @@ namespace WowVisionInstaller
                 string toolDir = ResolveToolDir(addonsFolder);
 
                 string startScript = Path.Combine(toolDir, "v2", "START.ahk");
+                string published = null;
                 if (File.Exists(startScript) && !force)
                 {
                     string installed = InstalledVersion(toolDir);
@@ -167,9 +228,11 @@ namespace WowVisionInstaller
                     if (!texturesOk)
                         Logger.Info($"WoW Login Tool {installed} present, but {interfaceDir} has no recognition textures; reinstalling.");
 
-                    if (texturesOk &&
-                        string.Equals(installed, Config.LoginToolVersion, StringComparison.OrdinalIgnoreCase))
+                    published = PublishedVersion(github);
+                    if (texturesOk && !IsNewer(published, installed))
                     {
+                        if (published == null)
+                            Logger.Warning($"WoW Login Tool: the published version could not be read; keeping the installed {installed ?? "copy (no version marker)"}.");
                         announce(Loc.Get("lt.present"));
                         Logger.Info($"WoW Login Tool {installed} already present at {toolDir}; skipping (use force to reinstall).");
                         EnsureRuntimeAndShortcut(toolDir, announce);   // still make sure AHK + shortcut exist
@@ -178,7 +241,8 @@ namespace WowVisionInstaller
                     // Older deployment (pre-marker installs count as oldest): fall
                     // through to a full reinstall. That also refreshes the Interface
                     // textures, which the new data.ini colour tables depend on.
-                    Logger.Info($"WoW Login Tool at {toolDir} is {(installed ?? "an older release (no version marker)")}; upgrading to {Config.LoginToolVersion}.");
+                    if (texturesOk)
+                        Logger.Info($"WoW Login Tool at {toolDir} is {(installed ?? "an older release (no version marker)")}; upgrading to {published}.");
                 }
 
                 Directory.CreateDirectory(TempRoot);
@@ -252,9 +316,14 @@ namespace WowVisionInstaller
                 }
 
                 // 6. Record which tool version is now deployed (drives the
-                //    skip/upgrade decision on the next run).
-                try { File.WriteAllText(Path.Combine(toolDir, VersionMarkerFile), Config.LoginToolVersion); }
+                //    skip/upgrade decision on the next run). Taken from the
+                //    unpacked tool itself, not from the version file: if the zip
+                //    was older than the file (caught between the two uploads),
+                //    the marker says so and the next run upgrades again.
+                string deployed = DeployedVersion(toolDir) ?? published ?? "unknown";
+                try { File.WriteAllText(Path.Combine(toolDir, VersionMarkerFile), deployed); }
                 catch (Exception ex) { Logger.Warning($"Login Tool: could not write version marker: {ex.Message}"); }
+                Logger.Info($"WoW Login Tool: deployed version {deployed}.");
 
                 // 7. AutoHotkey runtimes + launcher shortcut.
                 EnsureRuntimeAndShortcut(toolDir, announce);

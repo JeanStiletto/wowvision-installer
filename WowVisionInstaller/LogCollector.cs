@@ -824,7 +824,7 @@ namespace WowVisionInstaller
             sb.AppendLine($"Installer version:    {InstallerVersion()}");
             sb.AppendLine($"Channel:              {Config.CurrentChannel}");
             sb.AppendLine($"Latest release:       {Config.LatestTag} ({Config.AssetName}) {Config.LatestBuild ?? ""} {Config.LatestBuildDate?.ToString("u") ?? ""}");
-            sb.AppendLine($"Login tool version:   {Config.LoginToolVersion} (what this installer deploys)");
+            sb.AppendLine($"Login tool version:   the newest published one ({Config.LoginToolVersionAsset} on '{Config.LoginToolTag}'); installed: LoginTool\\installed-release.txt");
             sb.AppendLine($"OS:                   {Environment.OSVersion}");
             sb.AppendLine($"CLR:                  {Environment.Version}");
             sb.AppendLine($"64-bit OS:            {Environment.Is64BitOperatingSystem}");
